@@ -169,6 +169,14 @@ function App() {
             }
           />
           <Route
+            path="/cms/sapatamu/:invitationId/editor/:pageSlug"
+            element={
+              <RequireAuth roles={['CLIENT']}>
+                <CmsSapatamuEditor />
+              </RequireAuth>
+            }
+          />
+          <Route
             path="/cms/sapatamu/:invitationId/activate"
             element={
               <RequireAuth roles={['CLIENT']}>

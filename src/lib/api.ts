@@ -298,6 +298,69 @@ export async function sapatamuGetWorkspace<T>(invitationId: string): Promise<Api
   return data
 }
 
+export async function sapatamuGetEditor<T>(invitationId: string): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>(`/sapatamu/${invitationId}/editor`)
+  return data
+}
+
+export async function sapatamuPatchEditorDocument<T>(
+  invitationId: string,
+  payload: Record<string, unknown>,
+): Promise<ApiResponse<T>> {
+  const { data } = await api.patch<ApiResponse<T>>(`/sapatamu/${invitationId}/editor/document`, payload)
+  return data
+}
+
+export async function sapatamuReorderEditorPages<T>(
+  invitationId: string,
+  payload: Record<string, unknown>,
+): Promise<ApiResponse<T>> {
+  const { data } = await api.patch<ApiResponse<T>>(`/sapatamu/${invitationId}/editor/pages/reorder`, payload)
+  return data
+}
+
+export async function sapatamuToggleEditorPage<T>(
+  invitationId: string,
+  uniqueId: number,
+  payload: Record<string, unknown>,
+): Promise<ApiResponse<T>> {
+  const { data } = await api.patch<ApiResponse<T>>(`/sapatamu/${invitationId}/editor/pages/${uniqueId}/toggle`, payload)
+  return data
+}
+
+export async function sapatamuAddEditorPage<T>(
+  invitationId: string,
+  payload: Record<string, unknown>,
+): Promise<ApiResponse<T>> {
+  const { data } = await api.post<ApiResponse<T>>(`/sapatamu/${invitationId}/editor/pages`, payload)
+  return data
+}
+
+export async function sapatamuRemoveEditorPage<T>(
+  invitationId: string,
+  uniqueId: number,
+  payload: Record<string, unknown>,
+): Promise<ApiResponse<T>> {
+  const { data } = await api.delete<ApiResponse<T>>(`/sapatamu/${invitationId}/editor/pages/${uniqueId}`, {
+    data: payload,
+  })
+  return data
+}
+
+export async function sapatamuUploadEditorMedia<T>(
+  invitationId: string,
+  file: File,
+): Promise<ApiResponse<T>> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const { data } = await api.post<ApiResponse<T>>(`/sapatamu/${invitationId}/editor/media/upload`, formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  })
+  return data
+}
+
 export async function sapatamuUpdateSend<T>(
   invitationId: string,
   payload: Record<string, unknown>,
