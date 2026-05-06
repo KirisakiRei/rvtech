@@ -8,10 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { resolveApiAssetUrl } from '@/lib/api'
 import { BRAND, WEDDING_THEMES } from '@/lib/constants'
-import { PUBLIC_ADDITIONAL_SOURCE_THEME_IDS } from '@/lib/sapatamu-source-themes'
+import { PUBLIC_ADDITIONAL_SOURCE_THEME_IDS, PUBLIC_SOURCE_THEME_DEFAULT_MUSIC } from '@/lib/sapatamu-source-themes'
 import { dataCreate, dataDetail, dataList } from '@/lib/api'
 import { PUBLIC_SAPATAMU_EDITOR_FONTS } from '@/lib/sapatamu-editor-fonts'
-import { PreviewPage } from '@/pages/cms/sapatamu/CmsSapatamuEditor'
+import { BackgroundHeroOverlay, PreviewPage } from '@/pages/cms/sapatamu/CmsSapatamuEditor'
 import { ensureEditorFonts, reconcileEditorDocumentWithLayoutDefaults } from '@/pages/cms/sapatamu/editor/editor-utils'
 import type { SapatamuEditorDocumentV3, SapatamuEditorPage } from '@/types/sapatamu'
 import type { WeddingDetail, WeddingThemeId } from '@/types/wedding'
@@ -61,6 +61,26 @@ type EditorLayoutTemplateRow = {
   default_data_json: Record<string, unknown> | null
   sort_order: number
   is_active: boolean
+}
+
+function getYouTubeVideoId(url: string) {
+  const clean = url.trim()
+  if (!clean) return ''
+  try {
+    const parsed = new URL(clean)
+    if (parsed.hostname.includes('youtu.be')) return parsed.pathname.replace('/', '')
+    if (parsed.searchParams.get('v')) return parsed.searchParams.get('v') ?? ''
+    const embedMatch = parsed.pathname.match(/\/(?:embed|shorts)\/([^/?]+)/)
+    return embedMatch?.[1] ?? ''
+  } catch {
+    return ''
+  }
+}
+
+function buildYouTubePlayerUrl(url: string) {
+  const id = getYouTubeVideoId(url)
+  if (!id) return ''
+  return `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&enablejsapi=1&loop=1&playlist=${id}`
 }
 
 function reconcilePublicDocument(
@@ -261,14 +281,18 @@ export function TenantWeddingPage() {
   const guestName = searchParams.get('to') || 'Tamu Undangan'
   const mainRef = useRef<HTMLDivElement>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const youtubeFrameRef = useRef<HTMLIFrameElement | null>(null)
+  const youtubeFallbackTimerRef = useRef<number | null>(null)
 
   const [isOpen, setIsOpen] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
   const [isMusicPlaying, setIsMusicPlaying] = useState(false)
+  const [youtubeEmbedSrc, setYoutubeEmbedSrc] = useState('')
+  const [pageRunKeys, setPageRunKeys] = useState<Record<number, number>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [invitationId, setInvitationId] = useState<string | null>(null)
-  const [selectedTheme, setSelectedTheme] = useState<WeddingThemeId>('floral')
+  const [selectedTheme, setSelectedTheme] = useState<WeddingThemeId>('premium1')
   const [weddingData, setWeddingData] = useState<Partial<WeddingDetail>>(DEFAULT_WEDDING_DATA)
   const [editorDocument, setEditorDocument] = useState<SapatamuEditorDocumentV3 | null>(null)
   const [gallery, setGallery] = useState<InvitationMediaRow[]>([])
@@ -298,7 +322,17 @@ export function TenantWeddingPage() {
   useEffect(() => {
     if (!publicEmblaApi) return
 
-    const onSelect = () => setPublicPageIndex(publicEmblaApi.selectedScrollSnap())
+    const onSelect = () => {
+      const nextIndex = publicEmblaApi.selectedScrollSnap()
+      setPublicPageIndex(nextIndex)
+      const page = activeEditorPages[nextIndex]
+      if (page) {
+        setPageRunKeys((current) => ({
+          ...current,
+          [page.uniqueId]: (current[page.uniqueId] ?? 0) + 1,
+        }))
+      }
+    }
     onSelect()
     publicEmblaApi.on('select', onSelect)
     publicEmblaApi.on('reInit', onSelect)
@@ -307,14 +341,35 @@ export function TenantWeddingPage() {
       publicEmblaApi.off('select', onSelect)
       publicEmblaApi.off('reInit', onSelect)
     }
-  }, [publicEmblaApi])
+  }, [activeEditorPages, publicEmblaApi])
 
   useEffect(() => {
     publicEmblaApi?.reInit()
   }, [activeEditorPages.length, publicEmblaApi])
 
   useEffect(() => {
+    const activeSlide = document.querySelectorAll<HTMLElement>('.sapatamu-public-embla-slide')[publicPageIndex]
+    if (!activeSlide) return
+    activeSlide.querySelectorAll('video').forEach((video) => {
+      try {
+        video.currentTime = 0
+        void video.play().catch(() => undefined)
+      } catch {
+        // ignore browser media policy failures
+      }
+    })
+    activeSlide.querySelectorAll<HTMLIFrameElement>('iframe').forEach((frame) => {
+      if (frame.src) frame.src = frame.src
+    })
+  }, [pageRunKeys, publicPageIndex])
+
+  useEffect(() => {
     ensureEditorFonts(PUBLIC_SAPATAMU_EDITOR_FONTS)
+  }, [])
+
+  useEffect(() => () => {
+    if (youtubeFallbackTimerRef.current) window.clearTimeout(youtubeFallbackTimerRef.current)
+    audioRef.current?.pause()
   }, [])
 
   useEffect(() => {
@@ -391,7 +446,7 @@ export function TenantWeddingPage() {
         )
 
         setInvitationId(slugRow.invitation_id)
-        setSelectedTheme(content?.selectedTheme ?? 'floral')
+        setSelectedTheme(content?.selectedTheme ?? 'premium1')
         setGallery(mediaResponse.data?.items ?? [])
         setGuestMessages((greetingResponse.data?.items ?? []).map((item) => ({
           id: item.id,
@@ -429,6 +484,44 @@ export function TenantWeddingPage() {
     void loadInvitation()
   }, [guestName, slug])
 
+  const defaultThemeMusicUrl = editorDocument?.selectedTheme
+    ? PUBLIC_SOURCE_THEME_DEFAULT_MUSIC[editorDocument.selectedTheme]
+    : ''
+  const configuredMusicMode = editorDocument?.musicSettings?.mode
+  const configuredMusicValue = editorDocument?.musicSettings?.value?.trim() ?? ''
+  const resolvedAudioMusicUrl =
+    configuredMusicMode === 'none'
+      ? ''
+      : configuredMusicMode === 'library' && configuredMusicValue
+      ? configuredMusicValue
+      : weddingData.bgmUrl || defaultThemeMusicUrl
+  const canPlayMusic =
+    configuredMusicMode === 'none'
+      ? false
+      : configuredMusicMode === 'youtube'
+      ? Boolean(configuredMusicValue || defaultThemeMusicUrl)
+      : Boolean(resolvedAudioMusicUrl)
+
+  const playAudioUrl = (url: string) => {
+    if (!url) return
+    const bgmUrl = resolveApiAssetUrl(url)
+    if (!audioRef.current || audioRef.current.src !== new URL(bgmUrl, window.location.href).href) {
+      audioRef.current?.pause()
+      const audio = new Audio(bgmUrl)
+      audio.loop = true
+      audio.volume = 0.5
+      audioRef.current = audio
+    }
+    void audioRef.current.play().then(() => setIsMusicPlaying(true)).catch(() => undefined)
+  }
+
+  const postYoutubeCommand = (func: 'playVideo' | 'pauseVideo') => {
+    youtubeFrameRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: 'command', func, args: [] }),
+      'https://www.youtube.com',
+    )
+  }
+
   const handleOpenInvitation = () => {
     // 1. Scroll to salam page via Embla
     const salamIndex = activeEditorPages.findIndex((p) => p.family === 'salam')
@@ -446,21 +539,42 @@ export function TenantWeddingPage() {
     }
 
     // 3. Play background music
-    const bgmUrl = weddingData.bgmUrl ? resolveApiAssetUrl(weddingData.bgmUrl) : null
-    if (bgmUrl) {
-      if (!audioRef.current) {
-        const audio = new Audio(bgmUrl)
-        audio.loop = true
-        audio.volume = 0.5
-        audioRef.current = audio
+    if (configuredMusicMode === 'youtube' && configuredMusicValue) {
+      const playerUrl = buildYouTubePlayerUrl(configuredMusicValue)
+      if (playerUrl) {
+        audioRef.current?.pause()
+        setYoutubeEmbedSrc(playerUrl)
+        setIsMusicPlaying(true)
+        if (youtubeFallbackTimerRef.current) window.clearTimeout(youtubeFallbackTimerRef.current)
+        youtubeFallbackTimerRef.current = window.setTimeout(() => {
+          if (!defaultThemeMusicUrl) return
+          setYoutubeEmbedSrc('')
+          playAudioUrl(defaultThemeMusicUrl)
+        }, 4500)
+      } else {
+        playAudioUrl(defaultThemeMusicUrl)
       }
-      void audioRef.current.play().then(() => setIsMusicPlaying(true)).catch(() => undefined)
+    } else if (resolvedAudioMusicUrl) {
+      playAudioUrl(resolvedAudioMusicUrl)
     }
   }
 
   const handleMusicToggle = () => {
+    if (youtubeEmbedSrc) {
+      if (isMusicPlaying) {
+        postYoutubeCommand('pauseVideo')
+        setIsMusicPlaying(false)
+      } else {
+        postYoutubeCommand('playVideo')
+        setIsMusicPlaying(true)
+      }
+      return
+    }
     const audio = audioRef.current
-    if (!audio) return
+    if (!audio) {
+      if (resolvedAudioMusicUrl) playAudioUrl(resolvedAudioMusicUrl)
+      return
+    }
     if (isMusicPlaying) {
       audio.pause()
       setIsMusicPlaying(false)
@@ -539,13 +653,15 @@ export function TenantWeddingPage() {
       const globalBgUrl = editorDocument.editor.globalBackground
       const globalBgType = editorDocument.editor.globalBackgroundDetails?.type
       const hasDynamicBg = globalBgUrl && globalBgType !== 'video'
+      const backgroundHero = (editorDocument.editor.globalBackgroundDetails as { hero?: Parameters<typeof BackgroundHeroOverlay>[0]['hero'] }).hero
 
       const publicStageStyle: CSSProperties = hasDynamicBg
         ? {
             backgroundColor: editorDocument.editor.colorPalette.canvas,
             backgroundImage: `url(${resolveApiAssetUrl(globalBgUrl!)})`,
-            backgroundPosition: 'center top',
-            backgroundSize: 'cover',
+            backgroundPosition: 'center center',
+            backgroundRepeat: 'no-repeat',
+            backgroundSize: 'contain',
           }
         : {
             backgroundColor: editorDocument.editor.colorPalette.canvas,
@@ -562,6 +678,7 @@ export function TenantWeddingPage() {
               {activeEditorPages.map((page) => (
                 <div key={page.uniqueId} className="sapatamu-public-embla-slide" style={{ height: '100%' }}>
                   <PreviewPage
+                    key={`${page.uniqueId}-${pageRunKeys[page.uniqueId] ?? 0}`}
                     page={page}
                     invitationId={invitationId}
                     selectedElement={null}
@@ -582,6 +699,14 @@ export function TenantWeddingPage() {
             </div>
           </div>
 
+          {backgroundHero ? (
+            <BackgroundHeroOverlay
+              hero={backgroundHero}
+              fallbackImages={fallbackImages}
+              isEditing={false}
+            />
+          ) : null}
+
           {editorDocument.editor.navMenu.enabled && activeEditorPages.length > 1 ? (
             <nav className="sapatamu-public-premium1-nav" aria-label="Navigasi undangan">
               {activeEditorPages.map((page, index) => {
@@ -597,8 +722,8 @@ export function TenantWeddingPage() {
                     onClick={() => publicEmblaApi?.scrollTo(index)}
                     style={{
                       backgroundColor: isActive
-                        ? editorDocument.editor.navMenu.activeColor
-                        : editorDocument.editor.navMenu.inactiveColor,
+                        ? (editorDocument.editor.navMenu.activeColor || editorDocument.editor.colorPalette.accent)
+                        : (editorDocument.editor.navMenu.inactiveColor || editorDocument.editor.colorPalette.accentSoft),
                     }}
                   >
                     <img src={getSourceThemeNavIcon(editorDocument.selectedTheme, page)} alt="" className="size-4" />
@@ -607,8 +732,25 @@ export function TenantWeddingPage() {
               })}
             </nav>
           ) : null}
+          {youtubeEmbedSrc ? (
+            <iframe
+              ref={youtubeFrameRef}
+              title="Background music"
+              src={youtubeEmbedSrc}
+              allow="autoplay; encrypted-media"
+              onLoad={() => {
+                if (youtubeFallbackTimerRef.current) {
+                  window.clearTimeout(youtubeFallbackTimerRef.current)
+                  youtubeFallbackTimerRef.current = null
+                }
+                postYoutubeCommand('playVideo')
+                setIsMusicPlaying(true)
+              }}
+              className="pointer-events-none fixed bottom-0 left-0 size-px opacity-0"
+            />
+          ) : null}
           {/* Floating music toggle button */}
-          {audioRef.current || weddingData.bgmUrl ? (
+          {canPlayMusic || audioRef.current || youtubeEmbedSrc ? (
             <button
               type="button"
               className="fixed bottom-6 right-6 z-50 flex size-11 items-center justify-center rounded-full bg-white/20 text-white shadow-lg backdrop-blur-sm transition hover:bg-white/30"

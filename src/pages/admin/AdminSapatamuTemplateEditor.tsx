@@ -394,6 +394,22 @@ function ElementDesignInspector(props: {
           {'size1' in props.element ? <DesignNumberInput label="Size 1" value={props.element.size1} onChange={(value) => props.onChange(`${props.elementKey}.size1`, value)} /> : null}
           {'size2' in props.element ? <DesignNumberInput label="Size 2" value={props.element.size2} onChange={(value) => props.onChange(`${props.elementKey}.size2`, value)} /> : null}
           {'columns' in props.element ? <DesignNumberInput label="Columns" value={props.element.columns} onChange={(value) => props.onChange(`${props.elementKey}.columns`, value)} /> : null}
+          {type === 'gallery' ? (
+            <div>
+              <Label className="text-xs text-muted-foreground">Bento Template</Label>
+              <select
+                className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                value={String(props.element.variant ?? 'bento-feature-left')}
+                onChange={(event) => props.onChange(`${props.elementKey}.variant`, event.target.value)}
+              >
+                <option value="bento-feature-left">Feature Left</option>
+                <option value="bento-feature-right">Feature Right</option>
+                <option value="bento-banner">Banner</option>
+                <option value="bento-center">Center</option>
+                <option value="bento-mosaic">Mosaic</option>
+              </select>
+            </div>
+          ) : null}
           {'borderSize' in props.element ? <DesignNumberInput label="Border Size" value={props.element.borderSize} onChange={(value) => props.onChange(`${props.elementKey}.borderSize`, value)} /> : null}
           {'borderRadius' in props.element ? <DesignNumberInput label="Border Radius" value={props.element.borderRadius} onChange={(value) => props.onChange(`${props.elementKey}.borderRadius`, value)} /> : null}
         </div>

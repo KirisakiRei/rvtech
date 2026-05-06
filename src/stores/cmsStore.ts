@@ -55,7 +55,7 @@ const DEFAULT_WEDDING_DATA: Partial<WeddingDetail> = {
 
 export const useCmsStore = create<CmsState>((set) => ({
   currentStep: 0,
-  selectedTheme: 'floral',
+  selectedTheme: 'premium1',
   weddingData: DEFAULT_WEDDING_DATA,
   galleries: [],
   invitationId: null,
@@ -87,7 +87,7 @@ export const useCmsStore = create<CmsState>((set) => ({
       const contentJson = content?.content_json ?? {}
 
       const selectedTheme =
-        typeof contentJson?.selectedTheme === 'string' ? (contentJson.selectedTheme as WeddingThemeId) : 'floral'
+        typeof contentJson?.selectedTheme === 'string' ? (contentJson.selectedTheme as WeddingThemeId) : 'premium1'
 
       const storedWeddingData =
         contentJson?.weddingData && typeof contentJson.weddingData === 'object'
@@ -121,7 +121,7 @@ export const useCmsStore = create<CmsState>((set) => ({
         invitationId,
         contentId: null,
         currentVersion: 0,
-        selectedTheme: 'floral',
+        selectedTheme: 'premium1',
         weddingData: DEFAULT_WEDDING_DATA,
         galleries: [],
         isLoading: false,
@@ -201,7 +201,7 @@ export const useCmsStore = create<CmsState>((set) => ({
   reset: () =>
     set({
       currentStep: 0,
-      selectedTheme: 'floral',
+      selectedTheme: 'premium1',
       weddingData: DEFAULT_WEDDING_DATA,
       galleries: [],
       invitationId: null,

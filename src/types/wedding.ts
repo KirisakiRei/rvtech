@@ -42,8 +42,6 @@ export interface WeddingRsvp {
 }
 
 export type WeddingThemeId =
-  | 'anime'
-  | 'tradisional'
   | 'premium1'
   | 'sarune-batak-sangria'
   | 'amaryllis-tapestry-red-garnet'
@@ -54,12 +52,6 @@ export type WeddingThemeId =
   | 'panggih-prunella-midnight'
   | 'sindur-pinayung-imperial'
   | 'tresna-palakrama-tea-green'
-  | 'minimalist'
-  | 'bnw'
-  | 'floral'
-  | 'modern'
-  | 'retro'
-  | 'gallery'
 
 export interface WeddingThemePreset {
   id: WeddingThemeId

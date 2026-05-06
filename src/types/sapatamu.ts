@@ -276,6 +276,14 @@ export interface SapatamuWorkspace {
       mode: MusicMode
       value: string
     }
+    musicLibrary?: Array<{
+      id: string
+      themeCode: string
+      themeName: string
+      assetKey: string
+      url: string
+      fileName: string | null
+    }>
     extraLinks: {
       youtube: string
     }
@@ -430,6 +438,7 @@ export interface SapatamuEditorGalleryElement {
   title: string
   items: string[]
   columns: number
+  variant?: 'bento-feature-left' | 'bento-feature-right' | 'bento-banner' | 'bento-center' | 'bento-mosaic'
   padding: SapatamuEditorPadding
   animation: SapatamuEditorAnimation
 }

@@ -55,6 +55,17 @@ const TAB_ITEMS = [
   { key: 'settings', label: 'Setting' },
 ] as const
 
+function isPlayableYoutubeUrl(value: string) {
+  const clean = value.trim()
+  if (!clean) return true
+  try {
+    const parsed = new URL(clean)
+    return parsed.hostname.includes('youtube.com') || parsed.hostname.includes('youtu.be')
+  } catch {
+    return false
+  }
+}
+
 type TabKey = (typeof TAB_ITEMS)[number]['key']
 
 function createEmptyGuest(): WorkspaceGuest {
@@ -979,7 +990,29 @@ export function CmsSapatamuWorkspace() {
                 ))}
               </div>
               {settingsForm.musicMode !== 'none' && (
-                <Input value={settingsForm.musicValue} onChange={(event) => setSettingsForm((current) => ({ ...current, musicValue: event.target.value }))} placeholder={settingsForm.musicMode === 'library' ? 'Kode audio library' : 'Link YouTube'} className="h-11 rounded-xl" />
+                settingsForm.musicMode === 'library' ? (
+                  <select
+                    value={settingsForm.musicValue}
+                    onChange={(event) => setSettingsForm((current) => ({ ...current, musicValue: event.target.value }))}
+                    className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                  >
+                    <option value="">Musik default tema</option>
+                    {(workspace.settings.musicLibrary ?? []).map((item) => (
+                      <option key={item.id} value={item.url}>
+                        {item.themeName}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <>
+                    <Input value={settingsForm.musicValue} onChange={(event) => setSettingsForm((current) => ({ ...current, musicValue: event.target.value }))} placeholder="Link YouTube" className="h-11 rounded-xl" />
+                    {!isPlayableYoutubeUrl(settingsForm.musicValue) ? (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        Link YouTube tidak dapat divalidasi. Jika tidak bisa diputar di undangan, sistem akan memakai musik default tema.
+                      </div>
+                    ) : null}
+                  </>
+                )
               )}
               <Button onClick={() => void handleSaveSettings()} disabled={isSaving}>Save Music</Button>
             </AccordionContent>

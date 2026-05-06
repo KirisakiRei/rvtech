@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion'
-import { BRAND, PRODUCTS, formatRupiah } from '@/lib/constants'
+import { BRAND, PRODUCTS, WEDDING_THEMES, formatRupiah } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
 const features = [
@@ -20,21 +20,17 @@ const features = [
   { icon: Gift, title: 'Digital Angpao', description: 'Tamu bisa memberikan amplop digital langsung. Rekening terpampang jelas dan aman.', image: '/images/sapa_feat_6.png' },
 ]
 
-// Mock Data for Catalog Section
+const PREMIUM_THEME_CARDS = WEDDING_THEMES.map((theme) => ({
+  id: theme.id,
+  name: theme.name,
+  description: theme.description,
+  image: theme.previewImage,
+}))
+
 const CATALOG_TEMPLATES = {
-  basic: [
-    { id: 'minimalist', name: 'Clean Minimalist', description: 'Desain bersih dan modern dengan tipografi kuat.', image: '/themes/minimalist.jpg' },
-    { id: 'floral', name: 'Floral Garden', description: 'Nuansa taman bunga romantis dan estetik.', image: '/themes/floral.jpg' },
-    { id: 'tradisional', name: 'Nusantara Heritage', description: 'Keindahan motif batik yang tak lekang waktu.', image: '/themes/tradisional.jpg' },
-    { id: 'monochrome', name: 'Monochrome', description: 'Klasik minimalis hitam-putih nan elegan.', image: '/themes/bnw.jpg' },
-  ],
-  luxury: [
-    { id: 'cinematic', name: 'Cinematic Loop', description: 'Video latar belakang yang bergerak tenang.', image: '/themes/modern.jpg' },
-    { id: 'anime', name: 'Kawaii Story', description: 'Ilustrasi anime dengan mikro-animasi halus.', image: '/themes/anime.jpg' },
-  ],
-  royal: [
-    { id: 'sunny', name: 'Sunny Day (Full-Motion)', description: 'Pengalaman interaktif parallax-scroll eksklusif memukau tamu undangan Anda.', image: '/themes/gallery.jpg' },
-  ]
+  basic: PREMIUM_THEME_CARDS.slice(0, 4),
+  luxury: PREMIUM_THEME_CARDS.slice(4, 7),
+  royal: PREMIUM_THEME_CARDS.slice(7, 10),
 }
 
 // Pricing 3 Tiers Data
@@ -115,11 +111,7 @@ export function ProductSapaTamu() {
   const product = PRODUCTS.find((p) => p.id === 'sapatamu')!
 
   const handlePreviewClick = (templateId: string) => {
-    if (templateId === 'sunny') {
-      window.open('/demo-sunny', '_blank')
-    } else {
-      alert('Katalog Preview ini belum tersedia. Silakan klik "Preview" pada tipe "Sunny Day" di tab Royal.')
-    }
+    alert(`Preview katalog untuk tema ${templateId} belum tersedia di halaman publik. Gunakan preview dari dashboard admin/editor.`)
   }
 
   return (

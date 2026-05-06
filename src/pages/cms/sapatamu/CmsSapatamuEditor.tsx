@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { resolveApiAssetUrl, resolveGoogleMapsShareUrl } from '@/lib/api'
 import { getThemePreset, resolveThemeGroup } from '@/lib/sapatamu'
 import { PUBLIC_ADDITIONAL_SOURCE_THEME_IDS } from '@/lib/sapatamu-source-themes'
+import { cn } from '@/lib/utils'
 import {
   findEditorPageBySlug,
   getEditorActivePageIndex,
@@ -27,6 +28,7 @@ import {
 import type {
   SapatamuEditorButtonElement,
   SapatamuEditorCornerElement,
+  SapatamuEditorDocumentV3,
   SapatamuEditorGalleryElement,
   SapatamuEditorGiftElement,
   SapatamuEditorHydrationResponse,
@@ -99,16 +101,16 @@ function isSourceThemePreview(themeId: string | undefined, layoutCode: string) {
 
 type BackgroundHeroSettings = {
   left?: {
-    photo?: { enabled?: boolean; url?: string }
-    subTitle?: { enabled?: boolean; text?: string }
-    title?: { enabled?: boolean; text?: string }
-    description?: { enabled?: boolean; text?: string }
+    photo?: { enabled?: boolean; url?: string; x?: number; y?: number; size?: number }
+    subTitle?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
+    title?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
+    description?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
   }
   right?: {
-    photo?: { enabled?: boolean; url?: string }
-    title?: { enabled?: boolean; text?: string }
-    description?: { enabled?: boolean; text?: string }
-    music?: { enabled?: boolean; text?: string }
+    photo?: { enabled?: boolean; url?: string; x?: number; y?: number; size?: number }
+    title?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
+    description?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
+    music?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
   }
 }
 
@@ -132,6 +134,14 @@ const BACKGROUND_HERO_LABELS: Record<BackgroundHeroElementKey, string> = {
   'right.description': 'Right Description',
   'right.music': 'Right Music',
 }
+
+const GALLERY_VARIANTS = [
+  { value: 'bento-feature-left', label: 'Feature Left' },
+  { value: 'bento-feature-right', label: 'Feature Right' },
+  { value: 'bento-banner', label: 'Banner' },
+  { value: 'bento-center', label: 'Center' },
+  { value: 'bento-mosaic', label: 'Mosaic' },
+] as const
 
 const INPUT_CLASS =
   'h-10 rounded-xl border-border/70 bg-white/80 shadow-none focus-visible:border-accent focus-visible:ring-accent/20'
@@ -259,6 +269,17 @@ function padCountdown(value: number) {
 
 function getHeroText(value: string | undefined, fallback: string) {
   return value && value.trim() ? value : fallback
+}
+
+function getHeroItemStyle(node?: { x?: number; y?: number; size?: number }): CSSProperties {
+  const size = Number.isFinite(node?.size) ? Math.max(20, Math.min(240, Number(node?.size))) : 100
+  const x = Number.isFinite(node?.x) ? Number(node?.x) : 0
+  const y = Number.isFinite(node?.y) ? Number(node?.y) : 0
+  return {
+    '--hero-x': `${x}px`,
+    '--hero-y': `${y}px`,
+    '--hero-scale': size / 100,
+  } as CSSProperties
 }
 
 function getElementEditTitle(elementType: string | null) {
@@ -679,6 +700,11 @@ function EditorButtonPreview(props: {
     /kirim\s*(ucapan\s*)?\+?\s*rsvp/i.test(element.content) ||
     /konfirmasi.*rsvp/i.test(element.content)
   )
+  const isOpenButton = !isEditing && Boolean(onOpen) && (
+    element.link === '#open' ||
+    /buka\s+undangan/i.test(stripEditorHtml(element.content)) ||
+    (page.family === 'opening' && /open|undangan/i.test(stripEditorHtml(element.content)))
+  )
   const [giftOpen, setGiftOpen] = useState<'angpao' | 'kado' | false>(false)
   const [rsvpOpen, setRsvpOpen] = useState(false)
   const [rsvpForm, setRsvpForm] = useState({
@@ -776,7 +802,7 @@ function EditorButtonPreview(props: {
             >
               {buttonNode}
             </button>
-          ) : !isEditing && element.link === '#open' && onOpen ? (
+          ) : isOpenButton && onOpen ? (
             <button
               type="button"
               className="contents"
@@ -958,6 +984,7 @@ function EditorGalleryPreview(props: {
 }) {
   const { page, elementKey, element, selectedElement, invitationId, fallbackImages, onOpenLightbox, isEditing } = props
   const items = (element.items.length ? element.items : fallbackImages).slice(0, 9)
+  const variant = element.variant ?? 'bento-feature-left'
 
   return (
     <EditorElementFrame
@@ -970,16 +997,13 @@ function EditorGalleryPreview(props: {
       <div className="space-y-4 py-4">
         <p className="text-center text-lg font-semibold">{element.title}</p>
         <div
-          className="grid gap-3"
-          style={{
-            gridTemplateColumns: `repeat(${Math.max(1, Math.min(4, element.columns))}, minmax(0, 1fr))`,
-          }}
+          className={`sapatamu-gallery-bento sapatamu-gallery-bento-${variant}`}
         >
           {items.map((item, index) => (
             <button
               key={`${elementKey}-${index}`}
               type="button"
-              className="aspect-square overflow-hidden rounded-2xl bg-white/12"
+              className="overflow-hidden rounded-2xl bg-white/12"
               onClick={(event) => {
                 event.stopPropagation()
                 onOpenLightbox(index)
@@ -1052,10 +1076,13 @@ function EditorSimpleCardPreview(props: {
   invitationId: string
   isEditing: boolean
   rsvpMessages?: EditorGuestMessage[]
+  palette?: SapatamuEditorDocumentV3['editor']['colorPalette']
 }) {
-  const { page, elementKey, element, selectedElement, invitationId, isEditing, rsvpMessages = [] } = props
+  const { page, elementKey, element, selectedElement, invitationId, isEditing, rsvpMessages = [], palette } = props
   const isRsvp = element.type === 'rsvp'
   const isStory = element.type === 'story'
+  const isGift = element.type === 'gift'
+  const isCredit = element.type === 'credit'
   const storyElement = isStory ? element as SapatamuEditorStoryElement : null
   const [storyOpen, setStoryOpen] = useState(false)
   const [storyIndex, setStoryIndex] = useState(0)
@@ -1067,6 +1094,8 @@ function EditorSimpleCardPreview(props: {
     setStoryIndex((current) => (current + direction + storyItems.length) % storyItems.length)
   }
 
+  if (isGift) return null
+
   return (
     <EditorElementFrame
       page={page}
@@ -1076,12 +1105,19 @@ function EditorSimpleCardPreview(props: {
       isEditing={isEditing}
     >
       <div
-        className={`space-y-3 rounded-3xl px-5 py-5 editor-preview-glass ${getEditorAnimationClass(
+        className={`${isStory || isCredit ? 'space-y-3 px-5 py-5' : 'space-y-3 rounded-3xl px-5 py-5 editor-preview-glass'} ${getEditorAnimationClass(
           element.animation?.style,
         )}`}
         style={getAnimationInlineStyle(getAnimationDuration(element.animation))}
       >
-        <p className="text-lg font-semibold">{element.title}</p>
+        {isCredit ? (
+          <div className="space-y-2 text-center">
+            <p className="text-sm font-semibold">Sapatamu by Rekavia</p>
+            <img src="/brand-logo.png" alt="Rekavia" className="mx-auto h-7 w-auto object-contain" />
+          </div>
+        ) : (
+          <p className="text-lg font-semibold">{element.title}</p>
+        )}
         {element.type === 'sponsor' && Array.isArray(element.items) ? (
           <div className="space-y-4 text-center">
             {(element.items as ContactItem[]).map((item, index) => (
@@ -1114,9 +1150,6 @@ function EditorSimpleCardPreview(props: {
           </div>
         ) : isStory && storyElement ? (
           <div className="space-y-4 text-center">
-            <p className="text-sm leading-6 opacity-90">
-              {storyElement.description || 'Lihat perjalanan cinta kami dari awal bertemu hingga hari bahagia ini.'}
-            </p>
             <button
               type="button"
               className="inline-flex rounded-full border border-white/30 px-5 py-2 text-sm font-semibold transition hover:bg-white/20 active:scale-95"
@@ -1133,13 +1166,21 @@ function EditorSimpleCardPreview(props: {
             {(rsvpMessages.length ? rsvpMessages.slice(0, 5) : [
               { id: 'empty-rsvp-message', guestName: 'Belum ada ucapan', message: 'Ucapan tamu akan tampil di sini setelah mereka mengisi form.', createdAt: '' },
             ]).map((message) => (
-              <div key={message.id} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3">
+              <div
+                key={message.id}
+                className="rounded-2xl border px-4 py-3"
+                style={{
+                  borderColor: palette?.accentSoft ?? 'rgba(255,255,255,0.16)',
+                  backgroundColor: palette?.surface ?? 'rgba(255,255,255,0.1)',
+                  color: palette?.text ?? 'inherit',
+                }}
+              >
                 <p className="text-sm font-semibold">{message.guestName}</p>
                 <p className="mt-1 text-xs leading-5 opacity-80">{message.message}</p>
               </div>
             ))}
           </div>
-        ) : (
+        ) : isCredit ? null : (
           <p className="text-sm opacity-90">{element.description}</p>
         )}
         {!isRsvp && !isStory && 'buttonLabel' in element ? (
@@ -1409,18 +1450,20 @@ function BackgroundHeroEditableItem(props: {
   isSelected: boolean
   onSelect?: (elementKey: BackgroundHeroElementKey) => void
   className?: string
+  style?: CSSProperties
   children: ReactNode
 }) {
   const className = `sapatamu-background-hero-target ${props.className ?? ''}`
 
   if (!props.isEditing) {
-    return <div className={className}>{props.children}</div>
+    return <div className={className} style={props.style}>{props.children}</div>
   }
 
   return (
     <button
       type="button"
       className={className}
+      style={props.style}
       data-editing="true"
       data-selected={props.isSelected}
       onClick={(event) => {
@@ -1433,7 +1476,7 @@ function BackgroundHeroEditableItem(props: {
   )
 }
 
-function BackgroundHeroOverlay(props: {
+export function BackgroundHeroOverlay(props: {
   hero: BackgroundHeroSettings
   fallbackImages: string[]
   isEditing?: boolean
@@ -1453,6 +1496,7 @@ function BackgroundHeroOverlay(props: {
             isEditing={isEditing}
             isSelected={selectedElement === 'left.photo'}
             onSelect={onSelect}
+            style={getHeroItemStyle(left.photo)}
           >
             <BackgroundHeroPhoto url={left.photo.url} fallbackUrl={fallbackImages[0]} label="Pengantin kiri" />
           </BackgroundHeroEditableItem>
@@ -1463,6 +1507,7 @@ function BackgroundHeroOverlay(props: {
             isEditing={isEditing}
             isSelected={selectedElement === 'left.subTitle'}
             onSelect={onSelect}
+            style={getHeroItemStyle(left.subTitle)}
           >
             <p className="sapatamu-background-hero-subtitle">
               {getHeroText(left.subTitle.text, 'the wedding of')}
@@ -1475,6 +1520,7 @@ function BackgroundHeroOverlay(props: {
             isEditing={isEditing}
             isSelected={selectedElement === 'left.title'}
             onSelect={onSelect}
+            style={getHeroItemStyle(left.title)}
           >
             <p className="sapatamu-background-hero-title">
               {getHeroText(left.title.text, 'Ryan & Nanda')}
@@ -1487,6 +1533,7 @@ function BackgroundHeroOverlay(props: {
             isEditing={isEditing}
             isSelected={selectedElement === 'left.description'}
             onSelect={onSelect}
+            style={getHeroItemStyle(left.description)}
           >
             <p className="sapatamu-background-hero-description">
               {getHeroText(left.description.text, '#ryandannanda')}
@@ -1502,6 +1549,7 @@ function BackgroundHeroOverlay(props: {
             isEditing={isEditing}
             isSelected={selectedElement === 'right.photo'}
             onSelect={onSelect}
+            style={getHeroItemStyle(right.photo)}
           >
             <BackgroundHeroPhoto url={right.photo.url} fallbackUrl={fallbackImages[1] ?? fallbackImages[0]} label="Pengantin kanan" />
           </BackgroundHeroEditableItem>
@@ -1512,6 +1560,7 @@ function BackgroundHeroOverlay(props: {
             isEditing={isEditing}
             isSelected={selectedElement === 'right.title'}
             onSelect={onSelect}
+            style={getHeroItemStyle(right.title)}
           >
             <p className="sapatamu-background-hero-title">
               {getHeroText(right.title.text, '24 Januari 2027')}
@@ -1524,6 +1573,7 @@ function BackgroundHeroOverlay(props: {
             isEditing={isEditing}
             isSelected={selectedElement === 'right.description'}
             onSelect={onSelect}
+            style={getHeroItemStyle(right.description)}
           >
             <p className="sapatamu-background-hero-description">
               {getHeroText(right.description.text, 'engkaulah jantungku')}
@@ -1539,6 +1589,7 @@ function BackgroundHeroOverlay(props: {
             isEditing={isEditing}
             isSelected={selectedElement === 'right.music'}
             onSelect={onSelect}
+            style={getHeroItemStyle(right.music)}
           >
             <p className="sapatamu-background-hero-music">
             {getHeroText(right.music.text, 'Judul musik')}
@@ -1587,7 +1638,8 @@ export function PreviewPage(props: {
       : backgroundType === 'image' && background
         ? {
             backgroundImage: `url(${resolveApiAssetUrl(background)})`,
-            backgroundSize: 'cover',
+            backgroundSize: isSourceTheme ? 'contain' : 'cover',
+            backgroundRepeat: 'no-repeat',
             backgroundPosition: 'center',
           }
         : {
@@ -1715,6 +1767,7 @@ export function PreviewPage(props: {
                   invitationId={invitationId}
                   isEditing={isEditing}
                   rsvpMessages={rsvpMessages}
+                  palette={documentValue?.editor.colorPalette}
                 />
               )
             case 'gift':
@@ -2705,6 +2758,25 @@ function InspectorGalleryControls(props: {
           </Button>
         </ControlRow>
       </div>
+      <ControlRow label="Bento Template">
+        <div className="grid grid-cols-2 gap-2">
+          {GALLERY_VARIANTS.map((variant) => (
+            <button
+              key={variant.value}
+              type="button"
+              className={cn(
+                'rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-colors',
+                (element.variant ?? 'bento-feature-left') === variant.value
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                  : 'border-slate-200 bg-white text-slate-600',
+              )}
+              onClick={() => onPageField(`data.${elementKey}.variant`, variant.value)}
+            >
+              {variant.label}
+            </button>
+          ))}
+        </div>
+      </ControlRow>
       <div className="space-y-2">
         {element.items.map((item, index) => (
           <div key={`${item}-${index}`} className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2">
@@ -3448,12 +3520,15 @@ function BackgroundSettingsPanel(props: {
 
   const sectionToggle = (path: string, checked: boolean) => props.onGlobalField(`editor.globalBackgroundDetails.hero.${path}.enabled`, checked)
   const sectionText = (path: string, value: string) => props.onGlobalField(`editor.globalBackgroundDetails.hero.${path}.text`, value)
+  const sectionNumber = (path: string, key: 'x' | 'y' | 'size', value: number) =>
+    props.onGlobalField(`editor.globalBackgroundDetails.hero.${path}.${key}`, value)
   const selectedElement = props.selectedElement
   const getHeroNode = (path: BackgroundHeroElementKey) =>
     path.split('.').reduce<unknown>((current, segment) => {
       if (!current || typeof current !== 'object') return undefined
       return (current as Record<string, unknown>)[segment]
-    }, hero) as { enabled?: boolean; text?: string; url?: string } | undefined
+    }, hero) as { enabled?: boolean; text?: string; url?: string; x?: number; y?: number; size?: number } | undefined
+  const selectedNode = selectedElement ? getHeroNode(selectedElement) : undefined
   const selectedValue =
     selectedElement === 'left.photo'
       ? hero.left?.photo?.url ?? ''
@@ -3492,7 +3567,7 @@ function BackgroundSettingsPanel(props: {
               <div className="flex items-center justify-between rounded-2xl bg-white px-4 py-3">
                 <p className="text-sm font-semibold text-slate-900">{BACKGROUND_HERO_LABELS[selectedElement]}</p>
                 <Switch
-                  checked={Boolean(getHeroNode(selectedElement)?.enabled)}
+                  checked={Boolean(selectedNode?.enabled)}
                   onCheckedChange={(checked) => sectionToggle(selectedElement, checked)}
                 />
               </div>
@@ -3531,6 +3606,36 @@ function BackgroundSettingsPanel(props: {
                 />
               </InspectorSection>
             )}
+            <InspectorSection title="Position & Size">
+              <div className="grid grid-cols-3 gap-3">
+                <ControlRow label="X">
+                  <Input
+                    type="number"
+                    className={INPUT_CLASS}
+                    value={selectedNode?.x ?? 0}
+                    onChange={(event) => sectionNumber(selectedElement, 'x', Number(event.target.value))}
+                  />
+                </ControlRow>
+                <ControlRow label="Y">
+                  <Input
+                    type="number"
+                    className={INPUT_CLASS}
+                    value={selectedNode?.y ?? 0}
+                    onChange={(event) => sectionNumber(selectedElement, 'y', Number(event.target.value))}
+                  />
+                </ControlRow>
+                <ControlRow label="Size">
+                  <Input
+                    type="number"
+                    min={20}
+                    max={240}
+                    className={INPUT_CLASS}
+                    value={selectedNode?.size ?? 100}
+                    onChange={(event) => sectionNumber(selectedElement, 'size', Number(event.target.value))}
+                  />
+                </ControlRow>
+              </div>
+            </InspectorSection>
           </div>
         ) : (
           <>
