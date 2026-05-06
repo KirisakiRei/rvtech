@@ -91,6 +91,7 @@ export interface CmsHomeData {
 
 export interface DraftWizardState {
   step: number
+  invitationName: string
   slugCandidate: string
   themeId: string
   selectedPackageId: string | null
@@ -314,6 +315,10 @@ export interface SapatamuEditorAnimation {
 export interface SapatamuEditorPadding {
   top: number
   bottom: number
+  left?: number
+  right?: number
+  x?: number
+  y?: number
 }
 
 export interface SapatamuEditorTextBox {
@@ -462,10 +467,13 @@ export interface SapatamuEditorStoryElement {
   type: 'story'
   disabled: boolean
   title: string
+  description?: string
+  buttonLabel?: string
   items: Array<{
     title: string
     date: string
     description: string
+    image?: string
   }>
   padding: SapatamuEditorPadding
   animation: SapatamuEditorAnimation
@@ -574,6 +582,7 @@ export interface SapatamuEditorLayoutCatalogItem {
   sortOrder: number
   supportsPreviewSelection: boolean
   mediaRequirements: 'none' | 'image' | 'video' | 'mixed'
+  defaultVisible?: boolean
 }
 
 export interface SapatamuEditorFeatureGate {
@@ -621,14 +630,7 @@ export interface SapatamuEditorState {
     overlay: string
   }
   packageFeatures: SapatamuEditorPackageFeatures
-  layoutCatalogSnapshot: Array<{
-    layoutCode: string
-    family: string
-    title: string
-    previewImageUrl: string
-    requiredTier: TierCategory
-    requiredFeatureCode: string | null
-  }>
+  layoutCatalogSnapshot: SapatamuEditorLayoutCatalogItem[]
 }
 
 export interface SapatamuEditorDocumentV3 {
@@ -730,6 +732,7 @@ export interface SapatamuEditorHydrationResponse {
   document: SapatamuEditorDocumentV3
   currentVersion: number
   catalog: {
+    themes: SapatamuThemeCatalogItem[]
     layouts: SapatamuEditorLayoutCatalogItem[]
     fonts: SapatamuEditorFontCatalogItem[]
     featureGates: SapatamuEditorFeatureGate[]

@@ -10,7 +10,20 @@ import { ProductSapaTamu } from '@/pages/ProductSapaTamu'
 import { ProductEtalasePro } from '@/pages/ProductEtalasePro'
 import { ProductCitraKorpora } from '@/pages/ProductCitraKorpora'
 import { ProductEduGerbang } from '@/pages/ProductEduGerbang'
-import { AdminDashboard } from '@/pages/admin/AdminDashboard'
+import {
+  AdminAuditLogsPage,
+  AdminDashboard,
+  AdminFinancePage,
+  AdminProductDetailPage,
+  AdminProductsPage,
+  AdminSapatamuLayoutsPage,
+  AdminSapatamuPackagesPage,
+  AdminSapatamuTemplatesPage,
+  AdminUserDetailPage,
+  AdminUsersPage,
+  AdminVouchersPage,
+} from '@/pages/admin/AdminOperations'
+import { AdminSapatamuTemplateEditorPage } from '@/pages/admin/AdminSapatamuTemplateEditor'
 import { AdminTenants } from '@/pages/admin/AdminTenants'
 import { CmsDashboard } from '@/pages/cms/CmsDashboard'
 import { CmsProfil } from '@/pages/cms/CmsProfil'
@@ -119,6 +132,110 @@ function App() {
             element={
               <RequireAuth roles={['ADMIN']}>
                 <AdminTenants />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminUsersPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/users/:userId"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminUserDetailPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/finance"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminFinancePage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/vouchers"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminVouchersPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/products"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminProductsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/products/:productCode"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminProductDetailPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/products/sapatamu/templates"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminSapatamuTemplatesPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/products/sapatamu/templates/:templateId/editor"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminSapatamuTemplateEditorPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/products/sapatamu/templates/:templateId"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminSapatamuTemplatesPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/products/sapatamu/layouts"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminSapatamuLayoutsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/products/sapatamu/packages"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminSapatamuPackagesPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/audit-logs"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminAuditLogsPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin/settings"
+            element={
+              <RequireAuth roles={['ADMIN']}>
+                <AdminProductsPage />
               </RequireAuth>
             }
           />

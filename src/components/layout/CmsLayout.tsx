@@ -32,6 +32,10 @@ interface CmsLayoutProps {
   sidebarLinks: readonly SidebarLink[]
   title: string
   subtitle?: string
+  defaultCollapsed?: boolean
+  hideHeader?: boolean
+  mainClassName?: string
+  contentClassName?: string
 }
 
 function SidebarContent({ links, collapsed }: { links: readonly SidebarLink[], collapsed: boolean }) {
@@ -53,7 +57,9 @@ function SidebarContent({ links, collapsed }: { links: readonly SidebarLink[], c
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {links.map((link) => {
           const Icon = iconMap[link.icon] || LayoutDashboard
-          const isActive = location.pathname === link.href
+          const isActive = link.href === '/admin' || link.href === '/cms'
+            ? location.pathname === link.href
+            : location.pathname === link.href || location.pathname.startsWith(`${link.href}/`)
 
           return (
             <Link
@@ -97,8 +103,17 @@ function SidebarContent({ links, collapsed }: { links: readonly SidebarLink[], c
   )
 }
 
-export function CmsLayout({ children, sidebarLinks, title, subtitle }: CmsLayoutProps) {
-  const [collapsed, setCollapsed] = useState(false)
+export function CmsLayout({
+  children,
+  sidebarLinks,
+  title,
+  subtitle,
+  defaultCollapsed = false,
+  hideHeader = false,
+  mainClassName,
+  contentClassName,
+}: CmsLayoutProps) {
+  const [collapsed, setCollapsed] = useState(defaultCollapsed)
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -114,43 +129,46 @@ export function CmsLayout({ children, sidebarLinks, title, subtitle }: CmsLayout
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-40 bg-background/85 backdrop-blur-xl border-b border-border">
-          <div className="flex items-center justify-between px-4 lg:px-8 h-16">
-            <div className="flex items-center gap-3">
-              <div className="lg:hidden">
-                <Sheet>
-                  <SheetTrigger asChild>
-                    <Button variant="ghost" size="icon" id="cms-mobile-menu">
-                      <Menu className="w-5 h-5" />
-                    </Button>
-                  </SheetTrigger>
-                  <SheetContent side="left" className="p-0 w-64 bg-sidebar">
-                    <SidebarContent links={sidebarLinks} collapsed={false} />
-                  </SheetContent>
-                </Sheet>
-              </div>
+        {!hideHeader && (
+          <header className="sticky top-0 z-40 bg-background/85 backdrop-blur-xl border-b border-border">
+            <div className="flex items-center justify-between px-4 lg:px-8 h-16">
+              <div className="flex items-center gap-3">
+                <div className="lg:hidden">
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" size="icon" id="cms-mobile-menu">
+                        <Menu className="w-5 h-5" />
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="p-0 w-64 bg-sidebar">
+                      <SidebarContent links={sidebarLinks} collapsed={false} />
+                    </SheetContent>
+                  </Sheet>
+                </div>
 
-              <button
-                onClick={() => setCollapsed(!collapsed)}
-                className="hidden lg:flex p-1.5 rounded-md hover:bg-muted transition-colors duration-280"
-                aria-label={collapsed ? 'Perluas sidebar' : 'Kecilkan sidebar'}
-                id="cms-collapse-toggle"
-              >
-                <ChevronLeft className={cn('w-4 h-4 transition-transform duration-300', collapsed && 'rotate-180')} />
-              </button>
+                <button
+                  onClick={() => setCollapsed(!collapsed)}
+                  className="hidden lg:flex p-1.5 rounded-md hover:bg-muted transition-colors duration-280"
+                  aria-label={collapsed ? 'Perluas sidebar' : 'Kecilkan sidebar'}
+                  id="cms-collapse-toggle"
+                >
+                  <ChevronLeft className={cn('w-4 h-4 transition-transform duration-300', collapsed && 'rotate-180')} />
+                </button>
 
-              <div>
-                <h1 className="text-lg font-semibold text-foreground leading-tight">{title}</h1>
-                {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+                <div>
+                  <h1 className="text-lg font-semibold text-foreground leading-tight">{title}</h1>
+                  {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
-        <main className="flex-1 p-4 lg:p-8">
+        <main className={cn('flex-1 p-4 lg:p-8', mainClassName)}>
           <AnimatePresence mode="wait">
             <motion.div
               key={title}
+              className={contentClassName}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}

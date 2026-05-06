@@ -1,17 +1,24 @@
 import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import useEmblaCarousel from 'embla-carousel-react'
 import { MapPin, Clock, Heart, Send, ChevronDown, Music, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { resolveApiAssetUrl } from '@/lib/api'
 import { BRAND, WEDDING_THEMES } from '@/lib/constants'
+import { PUBLIC_ADDITIONAL_SOURCE_THEME_IDS } from '@/lib/sapatamu-source-themes'
 import { dataCreate, dataDetail, dataList } from '@/lib/api'
+import { PUBLIC_SAPATAMU_EDITOR_FONTS } from '@/lib/sapatamu-editor-fonts'
+import { PreviewPage } from '@/pages/cms/sapatamu/CmsSapatamuEditor'
+import { ensureEditorFonts, reconcileEditorDocumentWithLayoutDefaults } from '@/pages/cms/sapatamu/editor/editor-utils'
+import type { SapatamuEditorDocumentV3, SapatamuEditorPage } from '@/types/sapatamu'
 import type { WeddingDetail, WeddingThemeId } from '@/types/wedding'
 
 type InvitationRow = {
   id: string
+  template_id: string | null
   title: string
   bride_name: string | null
   groom_name: string | null
@@ -25,7 +32,7 @@ type InvitationSlugRow = {
 }
 
 type InvitationContentRow = {
-  content_json: {
+  content_json: Partial<SapatamuEditorDocumentV3> & {
     selectedTheme?: WeddingThemeId
     weddingData?: Partial<WeddingDetail>
   }
@@ -35,6 +42,72 @@ type InvitationMediaRow = {
   id: string
   url: string
   sort_order: number
+}
+
+type InvitationGreetingRow = {
+  id: string
+  guest_name: string
+  message: string
+  is_approved: boolean
+  created_at: string
+}
+
+type EditorLayoutTemplateRow = {
+  id: string
+  template_id: string | null
+  layout_code: string
+  family: string
+  title: string
+  default_data_json: Record<string, unknown> | null
+  sort_order: number
+  is_active: boolean
+}
+
+function reconcilePublicDocument(
+  document: SapatamuEditorDocumentV3 | null,
+  rows: EditorLayoutTemplateRow[],
+  templateId: string | null,
+) {
+  if (!document || rows.length === 0) return document
+
+  const snapshotDefaults = new Map(
+    (document.editor.layoutCatalogSnapshot ?? []).map((layout) => [
+      layout.layoutCode,
+      {
+        layoutCode: layout.layoutCode,
+        family: layout.family,
+        title: layout.title,
+        defaultPageData: layout.defaultPageData,
+        sortOrder: layout.sortOrder,
+        isActive: layout.defaultVisible !== false,
+      },
+    ]),
+  )
+  const rowsByCode = new Map<string, EditorLayoutTemplateRow>()
+  rows.forEach((row) => {
+    const existing = rowsByCode.get(row.layout_code)
+    if (!existing || (!existing.template_id && row.template_id === templateId)) {
+      rowsByCode.set(row.layout_code, row)
+    }
+  })
+
+  rowsByCode.forEach((row) => {
+    if (row.is_active === false) {
+      snapshotDefaults.delete(row.layout_code)
+      return
+    }
+    const existingDefault = snapshotDefaults.get(row.layout_code)
+    snapshotDefaults.set(row.layout_code, {
+      layoutCode: row.layout_code,
+      family: existingDefault?.family ?? row.family,
+      title: existingDefault?.title ?? row.title,
+      defaultPageData: row.default_data_json ?? existingDefault?.defaultPageData ?? {},
+      sortOrder: row.sort_order,
+      isActive: true,
+    })
+  })
+
+  return reconcileEditorDocumentWithLayoutDefaults(document, Array.from(snapshotDefaults.values()))
 }
 
 const DEFAULT_WEDDING_DATA: Partial<WeddingDetail> = {
@@ -56,6 +129,98 @@ const RSVP_OPTIONS = [
   { value: 'tidak', label: 'Tidak Hadir' },
   { value: 'ragu', label: 'Ragu-ragu' },
 ] as const
+
+const SOURCE_THEME_IDS = new Set(['premium1', 'sarune-batak-sangria', ...PUBLIC_ADDITIONAL_SOURCE_THEME_IDS])
+
+const SOURCE_THEME_NAV_ICON_BY_FAMILY: Record<string, Record<string, string>> = {
+  premium1: {
+    opening: 'icons/opening',
+    salam: 'icons/salam',
+    quote: 'icons/quote',
+    mempelai: 'icons/profile',
+    acara: 'icons/acara',
+    map: 'icons/map',
+    video: 'icons/video',
+    galeri: 'icons/galeri',
+    'live-streaming': 'icons/live',
+    'love-story': 'icons/love',
+    'extra-link': 'icons/extra-link',
+    rundown: 'icons/rundown',
+    doa: 'icons/doa',
+    rsvp: 'icons/rsvp',
+    gift: 'icons/gift',
+    contact: 'icons/contact',
+    thanks: 'icons/terimakasih',
+  },
+  'sarune-batak-sangria': {
+    opening: 'icons/opening',
+    salam: 'icons/salam',
+    quote: 'icons/quote',
+    mempelai: 'icons/profile',
+    acara: 'icons/acara',
+    map: 'icons/map',
+    video: 'icons/video',
+    galeri: 'icons/galeri',
+    'live-streaming': 'icons/live',
+    'love-story': 'default/love',
+    'extra-link': 'icons/extra-link',
+    rundown: 'icons/rundown',
+    doa: 'icons/doa',
+    rsvp: 'icons/rsvp',
+    gift: 'icons/gift',
+    contact: 'icons/contact',
+    thanks: 'icons/terimakasih',
+  },
+}
+
+const LEGACY_PREMIUM1_NAV_ICON_BY_FAMILY: Record<string, string> = {
+  opening: 'opening',
+  salam: 'salam',
+  quote: 'quote',
+  mempelai: 'profile',
+  acara: 'acara',
+  map: 'map',
+  video: 'video',
+  galeri: 'galeri',
+  'live-streaming': 'live',
+  'love-story': 'love',
+  'extra-link': 'extra-link',
+  rundown: 'rundown',
+  doa: 'doa',
+  rsvp: 'rsvp',
+  gift: 'gift',
+  contact: 'contact',
+  thanks: 'terimakasih',
+}
+
+const SOURCE_THEME_DEFAULT_NAV_ICON_BY_FAMILY: Record<string, string> = {
+  opening: 'icons/opening',
+  salam: 'icons/salam',
+  quote: 'icons/quote',
+  mempelai: 'icons/profile',
+  acara: 'icons/acara',
+  map: 'icons/map',
+  video: 'icons/video',
+  galeri: 'icons/galeri',
+  'live-streaming': 'icons/live',
+  'love-story': 'default/love',
+  'extra-link': 'icons/extra-link',
+  rundown: 'icons/rundown',
+  doa: 'icons/doa',
+  rsvp: 'icons/rsvp',
+  gift: 'icons/gift',
+  contact: 'icons/contact',
+  thanks: 'icons/terimakasih',
+}
+
+function getSourceThemeNavIcon(themeId: string, page: SapatamuEditorPage): string {
+  const themeIcons = SOURCE_THEME_NAV_ICON_BY_FAMILY[themeId]
+  const icon =
+    themeIcons?.[page.family] ??
+    SOURCE_THEME_DEFAULT_NAV_ICON_BY_FAMILY[page.family] ??
+    `icons/${LEGACY_PREMIUM1_NAV_ICON_BY_FAMILY[page.family] ?? 'opening'}`
+  return `/sapatamu-themes/${themeId}/original/${icon}.svg`
+}
 
 function Countdown({ targetDate }: { targetDate: string }) {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
@@ -95,29 +260,62 @@ export function TenantWeddingPage() {
   const [searchParams] = useSearchParams()
   const guestName = searchParams.get('to') || 'Tamu Undangan'
   const mainRef = useRef<HTMLDivElement>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const [isOpen, setIsOpen] = useState(false)
   const [isMuted, setIsMuted] = useState(true)
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [invitationId, setInvitationId] = useState<string | null>(null)
   const [selectedTheme, setSelectedTheme] = useState<WeddingThemeId>('floral')
   const [weddingData, setWeddingData] = useState<Partial<WeddingDetail>>(DEFAULT_WEDDING_DATA)
+  const [editorDocument, setEditorDocument] = useState<SapatamuEditorDocumentV3 | null>(null)
   const [gallery, setGallery] = useState<InvitationMediaRow[]>([])
+  const [guestMessages, setGuestMessages] = useState<Array<{ id: string; guestName: string; message: string; createdAt?: string }>>([])
   const [rsvpStatus, setRsvpStatus] = useState<'hadir' | 'tidak' | 'ragu' | ''>('')
   const [rsvpName, setRsvpName] = useState(guestName)
   const [rsvpMessage, setRsvpMessage] = useState('')
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [publicEmblaRef, publicEmblaApi] = useEmblaCarousel({ axis: 'y', containScroll: 'trimSnaps', dragFree: false })
+  const [publicPageIndex, setPublicPageIndex] = useState(0)
 
   const theme = useMemo(
     () => WEDDING_THEMES.find((item) => item.id === selectedTheme) || WEDDING_THEMES[0],
     [selectedTheme],
   )
 
+  const activeEditorPages = useMemo(
+    () => editorDocument?.editor.pages.filter((page) => page.isActive) ?? [],
+    [editorDocument],
+  )
+
   useEffect(() => {
     setRsvpName(guestName)
   }, [guestName])
+
+  useEffect(() => {
+    if (!publicEmblaApi) return
+
+    const onSelect = () => setPublicPageIndex(publicEmblaApi.selectedScrollSnap())
+    onSelect()
+    publicEmblaApi.on('select', onSelect)
+    publicEmblaApi.on('reInit', onSelect)
+
+    return () => {
+      publicEmblaApi.off('select', onSelect)
+      publicEmblaApi.off('reInit', onSelect)
+    }
+  }, [publicEmblaApi])
+
+  useEffect(() => {
+    publicEmblaApi?.reInit()
+  }, [activeEditorPages.length, publicEmblaApi])
+
+  useEffect(() => {
+    ensureEditorFonts(PUBLIC_SAPATAMU_EDITOR_FONTS)
+  }, [])
 
   useEffect(() => {
     if (!slug) {
@@ -142,7 +340,7 @@ export function TenantWeddingPage() {
         }
 
         const invitationResponse = await dataDetail<InvitationRow>('invitations', slugRow.invitation_id)
-        const [contentResponse, mediaResponse] = await Promise.all([
+        const [contentResponse, mediaResponse, greetingResponse] = await Promise.all([
           dataList<InvitationContentRow>('invitation-contents', {
             where: { invitation_id: slugRow.invitation_id, is_current: true },
             orderBy: { version: 'desc' },
@@ -153,22 +351,55 @@ export function TenantWeddingPage() {
             orderBy: { sort_order: 'asc' },
             limit: 20,
           }),
+          dataList<InvitationGreetingRow>('invitation-greetings', {
+            where: { invitation_id: slugRow.invitation_id, is_approved: true },
+            orderBy: { created_at: 'desc' },
+            limit: 30,
+          }),
         ])
 
         const invitation = invitationResponse.data
         if (!invitation || invitation.status !== 'published') {
           setInvitationId(slugRow.invitation_id)
           setGallery([])
+          setGuestMessages([])
+          setEditorDocument(null)
           setWeddingData(DEFAULT_WEDDING_DATA)
           setError('Undangan ini belum aktif. Silakan kembali lagi setelah pemilik mengaktifkannya.')
           return
         }
         const content = contentResponse.data?.items?.[0]?.content_json
         const contentWeddingData = content?.weddingData ?? {}
+        const nextEditorDocument =
+          content?.schemaVersion === 3 && content.editor?.pages?.length
+            ? (content as SapatamuEditorDocumentV3)
+            : null
+        const layoutRowsResponse = invitation?.template_id
+          ? await dataList<EditorLayoutTemplateRow>('editor-layout-templates', {
+              where: {
+                product_code: 'sapatamu',
+                OR: [{ template_id: null }, { template_id: invitation.template_id }],
+              },
+              orderBy: { sort_order: 'asc' },
+              limit: 100,
+            }).catch(() => ({ data: { items: [] } }))
+          : { data: { items: [] as EditorLayoutTemplateRow[] } }
+        const reconciledEditorDocument = reconcilePublicDocument(
+          nextEditorDocument,
+          layoutRowsResponse.data?.items ?? [],
+          invitation?.template_id ?? null,
+        )
 
         setInvitationId(slugRow.invitation_id)
         setSelectedTheme(content?.selectedTheme ?? 'floral')
         setGallery(mediaResponse.data?.items ?? [])
+        setGuestMessages((greetingResponse.data?.items ?? []).map((item) => ({
+          id: item.id,
+          guestName: item.guest_name,
+          message: item.message,
+          createdAt: item.created_at,
+        })))
+        setEditorDocument(reconciledEditorDocument)
         setWeddingData({
           ...DEFAULT_WEDDING_DATA,
           ...contentWeddingData,
@@ -186,6 +417,8 @@ export function TenantWeddingPage() {
       } catch {
         setInvitationId(null)
         setGallery([])
+        setGuestMessages([])
+        setEditorDocument(null)
         setWeddingData(DEFAULT_WEDDING_DATA)
         setError('Undangan tidak tersedia atau belum dipublikasikan.')
       } finally {
@@ -195,6 +428,46 @@ export function TenantWeddingPage() {
 
     void loadInvitation()
   }, [guestName, slug])
+
+  const handleOpenInvitation = () => {
+    // 1. Scroll to salam page via Embla
+    const salamIndex = activeEditorPages.findIndex((p) => p.family === 'salam')
+    if (salamIndex >= 0) {
+      publicEmblaApi?.scrollTo(salamIndex)
+    } else {
+      // Fallback: scroll to second page
+      publicEmblaApi?.scrollTo(Math.min(1, activeEditorPages.length - 1))
+    }
+
+    // 2. Request fullscreen
+    const root = document.documentElement
+    if (root.requestFullscreen) {
+      void root.requestFullscreen().catch(() => undefined)
+    }
+
+    // 3. Play background music
+    const bgmUrl = weddingData.bgmUrl ? resolveApiAssetUrl(weddingData.bgmUrl) : null
+    if (bgmUrl) {
+      if (!audioRef.current) {
+        const audio = new Audio(bgmUrl)
+        audio.loop = true
+        audio.volume = 0.5
+        audioRef.current = audio
+      }
+      void audioRef.current.play().then(() => setIsMusicPlaying(true)).catch(() => undefined)
+    }
+  }
+
+  const handleMusicToggle = () => {
+    const audio = audioRef.current
+    if (!audio) return
+    if (isMusicPlaying) {
+      audio.pause()
+      setIsMusicPlaying(false)
+    } else {
+      void audio.play().then(() => setIsMusicPlaying(true)).catch(() => undefined)
+    }
+  }
 
   const handleOpen = () => {
     setIsOpen(true)
@@ -224,6 +497,15 @@ export function TenantWeddingPage() {
           message: rsvpMessage.trim(),
           is_approved: true,
         })
+        setGuestMessages((current) => [
+          {
+            id: `local-${Date.now()}`,
+            guestName: rsvpName,
+            message: rsvpMessage.trim(),
+            createdAt: new Date().toISOString(),
+          },
+          ...current,
+        ])
       }
 
       setIsSubmitted(true)
@@ -244,6 +526,123 @@ export function TenantWeddingPage() {
           <p className="text-2xl font-heading text-foreground mt-3">Undangan Belum Aktif</p>
           <p className="text-sm text-muted-foreground mt-3 leading-7">{error}</p>
         </div>
+      </div>
+    )
+  }
+
+  if (editorDocument && invitationId) {
+    const invitationLink = `https://${BRAND.domain}/${slug}`
+    const fallbackImages = gallery.map((item) => item.url)
+    const isSourceThemeDocument = SOURCE_THEME_IDS.has(editorDocument.selectedTheme)
+
+    if (isSourceThemeDocument) {
+      const globalBgUrl = editorDocument.editor.globalBackground
+      const globalBgType = editorDocument.editor.globalBackgroundDetails?.type
+      const hasDynamicBg = globalBgUrl && globalBgType !== 'video'
+
+      const publicStageStyle: CSSProperties = hasDynamicBg
+        ? {
+            backgroundColor: editorDocument.editor.colorPalette.canvas,
+            backgroundImage: `url(${resolveApiAssetUrl(globalBgUrl!)})`,
+            backgroundPosition: 'center top',
+            backgroundSize: 'cover',
+          }
+        : {
+            backgroundColor: editorDocument.editor.colorPalette.canvas,
+            backgroundPosition: 'center center',
+          }
+
+      return (
+        <div
+          className="sapatamu-public-theme-preview sapatamu-public-premium1-preview sapatamu-public-source-preview min-h-screen"
+          style={publicStageStyle}
+        >
+          <div className="sapatamu-public-embla" ref={publicEmblaRef}>
+            <div className="sapatamu-public-embla-track">
+              {activeEditorPages.map((page) => (
+                <div key={page.uniqueId} className="sapatamu-public-embla-slide" style={{ height: '100%' }}>
+                  <PreviewPage
+                    page={page}
+                    invitationId={invitationId}
+                    selectedElement={null}
+                    documentValue={editorDocument}
+                    invitationLink={invitationLink}
+                    fonts={PUBLIC_SAPATAMU_EDITOR_FONTS}
+                    fallbackImages={fallbackImages}
+                    onOpenLightbox={() => undefined}
+                    isEditing={false}
+                    onOpen={handleOpenInvitation}
+                    rsvpInitialName={guestName}
+                    rsvpMessages={guestMessages}
+                    onRsvpSubmitted={(message) => setGuestMessages((current) => [message, ...current])}
+                    giftAccounts={editorDocument.settings.giftAccounts}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {editorDocument.editor.navMenu.enabled && activeEditorPages.length > 1 ? (
+            <nav className="sapatamu-public-premium1-nav" aria-label="Navigasi undangan">
+              {activeEditorPages.map((page, index) => {
+                const isActive = index === publicPageIndex
+                return (
+                  <button
+                    key={page.uniqueId}
+                    type="button"
+                    className="sapatamu-public-premium1-nav-button"
+                    data-active={isActive}
+                    aria-label={page.title}
+                    title={page.title}
+                    onClick={() => publicEmblaApi?.scrollTo(index)}
+                    style={{
+                      backgroundColor: isActive
+                        ? editorDocument.editor.navMenu.activeColor
+                        : editorDocument.editor.navMenu.inactiveColor,
+                    }}
+                  >
+                    <img src={getSourceThemeNavIcon(editorDocument.selectedTheme, page)} alt="" className="size-4" />
+                  </button>
+                )
+              })}
+            </nav>
+          ) : null}
+          {/* Floating music toggle button */}
+          {audioRef.current || weddingData.bgmUrl ? (
+            <button
+              type="button"
+              className="fixed bottom-6 right-6 z-50 flex size-11 items-center justify-center rounded-full bg-white/20 text-white shadow-lg backdrop-blur-sm transition hover:bg-white/30"
+              onClick={handleMusicToggle}
+              aria-label={isMusicPlaying ? 'Matikan musik' : 'Putar musik'}
+            >
+              {isMusicPlaying ? <Music className="size-4" /> : <VolumeX className="size-4" />}
+            </button>
+          ) : null}
+        </div>
+      )
+    }
+
+    return (
+      <div className="sapatamu-public-theme-preview min-h-screen bg-[#4b2924]">
+        {activeEditorPages.map((page) => (
+          <PreviewPage
+            key={page.uniqueId}
+            page={page}
+            invitationId={invitationId}
+            selectedElement={null}
+            documentValue={editorDocument}
+            invitationLink={invitationLink}
+            fonts={PUBLIC_SAPATAMU_EDITOR_FONTS}
+            fallbackImages={fallbackImages}
+            onOpenLightbox={() => undefined}
+            isEditing={false}
+            onOpen={handleOpenInvitation}
+            rsvpInitialName={guestName}
+            rsvpMessages={guestMessages}
+            onRsvpSubmitted={(message) => setGuestMessages((current) => [message, ...current])}
+            giftAccounts={editorDocument.settings.giftAccounts}
+          />
+        ))}
       </div>
     )
   }

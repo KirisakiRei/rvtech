@@ -41,6 +41,7 @@ export type DataEntity =
   | 'invitation-visits'
   | 'invitation-rsvps'
   | 'invitation-greetings'
+  | 'editor-layout-templates'
   | 'invitation-analytics-daily'
 
 const ACCESS_TOKEN_KEY = 'rekavia_access_token'
@@ -48,6 +49,7 @@ const REFRESH_TOKEN_KEY = 'rekavia_refresh_token'
 const SESSION_EXPIRED_KEY = 'rekavia_session_expired'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000'
+const FRONTEND_STATIC_PREFIXES = ['/images/', '/sapatamu-layouts/', '/sapatamu-themes/', '/themes/']
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -58,6 +60,13 @@ export function resolveApiAssetUrl(path: string | null | undefined): string {
   if (!path) return ''
 
   if (/^https?:\/\//i.test(path)) {
+    return path
+  }
+
+  if (FRONTEND_STATIC_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+    if (typeof window !== 'undefined') {
+      return new URL(path, window.location.origin).toString()
+    }
     return path
   }
 
@@ -231,6 +240,167 @@ export async function cmsHome<T>(): Promise<ApiResponse<T>> {
   return data
 }
 
+type AdminQuery = {
+  page?: number
+  limit?: number
+  search?: string
+  status?: string
+  productCode?: string
+  dateFrom?: string
+  dateTo?: string
+  sort?: string
+}
+
+export async function adminOverview<T>(): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>('/admin/overview')
+  return data
+}
+
+export async function adminUsers<T>(query?: AdminQuery): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>('/admin/users', { params: query })
+  return data
+}
+
+export async function adminUserDetail<T>(userId: string): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>(`/admin/users/${userId}`)
+  return data
+}
+
+export async function adminSetUserStatus<T>(userId: string, status: 'active' | 'suspended'): Promise<ApiResponse<T>> {
+  const { data } = await api.patch<ApiResponse<T>>(`/admin/users/${userId}/status`, { status })
+  return data
+}
+
+export async function adminProducts<T>(): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>('/admin/products')
+  return data
+}
+
+export async function adminProductOverview<T>(productCode: string): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>(`/admin/products/${productCode}/overview`)
+  return data
+}
+
+export async function adminSapatamuTemplates<T>(query?: AdminQuery): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>('/admin/sapatamu/templates', { params: query })
+  return data
+}
+
+export async function adminSaveSapatamuTemplate<T>(payload: Record<string, unknown>, id?: string): Promise<ApiResponse<T>> {
+  const { data } = id
+    ? await api.patch<ApiResponse<T>>(`/admin/sapatamu/templates/${id}`, payload)
+    : await api.post<ApiResponse<T>>('/admin/sapatamu/templates', payload)
+  return data
+}
+
+export async function adminSapatamuAssets<T>(templateId: string): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>(`/admin/sapatamu/templates/${templateId}/assets`)
+  return data
+}
+
+export async function adminSapatamuTemplateEditor<T>(templateId: string): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>(`/admin/sapatamu/templates/${templateId}/editor`)
+  return data
+}
+
+export async function adminSaveSapatamuTemplateEditorDefaults<T>(
+  templateId: string,
+  payload: Record<string, unknown>,
+): Promise<ApiResponse<T>> {
+  const { data } = await api.patch<ApiResponse<T>>(`/admin/sapatamu/templates/${templateId}/editor/defaults`, payload)
+  return data
+}
+
+export async function adminSaveSapatamuTemplateEditorLayout<T>(
+  templateId: string,
+  layoutCode: string,
+  payload: Record<string, unknown>,
+): Promise<ApiResponse<T>> {
+  const { data } = await api.patch<ApiResponse<T>>(`/admin/sapatamu/templates/${templateId}/editor/layouts/${layoutCode}`, payload)
+  return data
+}
+
+export async function adminCreateSapatamuAsset<T>(templateId: string, payload: Record<string, unknown>): Promise<ApiResponse<T>> {
+  const { data } = await api.post<ApiResponse<T>>(`/admin/sapatamu/templates/${templateId}/assets`, payload)
+  return data
+}
+
+export async function adminUpdateSapatamuAsset<T>(assetId: string, payload: Record<string, unknown>): Promise<ApiResponse<T>> {
+  const { data } = await api.patch<ApiResponse<T>>(`/admin/sapatamu/assets/${assetId}`, payload)
+  return data
+}
+
+export async function resolveGoogleMapsShareUrl(url: string): Promise<string> {
+  const { data } = await api.get<ApiResponse<{ url: string }>>('/maps/resolve', { params: { url } })
+  return data.data?.url || ''
+}
+
+export async function adminDeleteSapatamuAsset(assetId: string): Promise<ApiResponse> {
+  const { data } = await api.delete<ApiResponse>(`/admin/sapatamu/assets/${assetId}`)
+  return data
+}
+
+export async function adminSapatamuLayouts<T>(query?: AdminQuery): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>('/admin/sapatamu/layouts', { params: query })
+  return data
+}
+
+export async function adminSaveSapatamuLayout<T>(payload: Record<string, unknown>, id?: string): Promise<ApiResponse<T>> {
+  const { data } = id
+    ? await api.patch<ApiResponse<T>>(`/admin/sapatamu/layouts/${id}`, payload)
+    : await api.post<ApiResponse<T>>('/admin/sapatamu/layouts', payload)
+  return data
+}
+
+export async function adminPackages<T>(query?: AdminQuery): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>('/admin/packages', { params: query })
+  return data
+}
+
+export async function adminSavePackage<T>(payload: Record<string, unknown>, id?: string): Promise<ApiResponse<T>> {
+  const { data } = id
+    ? await api.patch<ApiResponse<T>>(`/admin/packages/${id}`, payload)
+    : await api.post<ApiResponse<T>>('/admin/packages', payload)
+  return data
+}
+
+export async function adminVouchers<T>(query?: AdminQuery): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>('/admin/vouchers', { params: query })
+  return data
+}
+
+export async function adminSaveVoucher<T>(payload: Record<string, unknown>, id?: string): Promise<ApiResponse<T>> {
+  const { data } = id
+    ? await api.patch<ApiResponse<T>>(`/admin/vouchers/${id}`, payload)
+    : await api.post<ApiResponse<T>>('/admin/vouchers', payload)
+  return data
+}
+
+export async function adminFinanceOrders<T>(query?: AdminQuery): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>('/admin/finance/orders', { params: query })
+  return data
+}
+
+export async function adminFinancePayments<T>(query?: AdminQuery): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>('/admin/finance/payments', { params: query })
+  return data
+}
+
+export async function adminFinancePaymentDetail<T>(paymentId: string): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>(`/admin/finance/payments/${paymentId}`)
+  return data
+}
+
+export async function adminReconcilePayment<T>(paymentId: string, payload: Record<string, unknown>): Promise<ApiResponse<T>> {
+  const { data } = await api.post<ApiResponse<T>>(`/admin/finance/payments/${paymentId}/reconcile`, payload)
+  return data
+}
+
+export async function adminAuditLogs<T>(query?: AdminQuery): Promise<ApiResponse<T>> {
+  const { data } = await api.get<ApiResponse<T>>('/admin/audit-logs', { params: query })
+  return data
+}
+
 export async function sapatamuCreateDraft<T>(payload: Record<string, unknown>): Promise<ApiResponse<T>> {
   const { data } = await api.post<ApiResponse<T>>('/sapatamu/drafts', payload)
   return data
@@ -308,6 +478,14 @@ export async function sapatamuPatchEditorDocument<T>(
   payload: Record<string, unknown>,
 ): Promise<ApiResponse<T>> {
   const { data } = await api.patch<ApiResponse<T>>(`/sapatamu/${invitationId}/editor/document`, payload)
+  return data
+}
+
+export async function sapatamuApplyEditorTheme<T>(
+  invitationId: string,
+  payload: { baseVersion: number; themeId: string },
+): Promise<ApiResponse<T>> {
+  const { data } = await api.post<ApiResponse<T>>(`/sapatamu/${invitationId}/editor/apply-theme`, payload)
   return data
 }
 

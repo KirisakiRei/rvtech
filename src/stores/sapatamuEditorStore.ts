@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import {
   sapatamuAddEditorPage,
+  sapatamuApplyEditorTheme,
   sapatamuGetEditor,
   sapatamuPatchEditorDocument,
   sapatamuReorderEditorPages,
@@ -47,10 +48,13 @@ interface SapatamuEditorStore {
   togglePage: (invitationId: string, uniqueId: number, isActive: boolean) => Promise<void>
   addPage: (invitationId: string, layoutCode: string, afterUniqueId?: number) => Promise<void>
   removePage: (invitationId: string, uniqueId: number) => Promise<void>
+  applyTheme: (invitationId: string, themeId: string) => Promise<void>
   uploadMedia: (invitationId: string, file: File) => Promise<void>
   setLightbox: (payload: Partial<{ open: boolean; index: number }>) => void
   clearError: () => void
 }
+
+let activeFlushPromise: Promise<void> | null = null
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T
@@ -242,26 +246,58 @@ export const useSapatamuEditorStore = create<SapatamuEditorStore>((set, get) => 
   flushPending: async (invitationId) => {
     const { pendingOperations, currentVersion } = get()
     if (pendingOperations.length === 0) return
+    if (activeFlushPromise) return activeFlushPromise
 
-    set({ isSaving: true, error: null })
+    const operationsToSave = [...pendingOperations]
+    set((state) => ({
+      isSaving: true,
+      error: null,
+      pendingOperations: state.pendingOperations.slice(operationsToSave.length),
+    }))
 
-    try {
+    activeFlushPromise = (async () => {
       const response = await sapatamuPatchEditorDocument<SapatamuEditorHydrationResponse>(invitationId, {
         baseVersion: currentVersion,
-        operations: pendingOperations,
+        operations: operationsToSave,
       })
 
       if (!response.data) {
         throw new Error('Response editor kosong setelah save.')
       }
 
-      setResponseState(set, response.data)
+      set((state) => {
+        const queuedOperations = state.pendingOperations
+        let document = response.data!.document
+        queuedOperations.forEach((operation) => {
+          document = applyLocalOperation(document, operation)
+        })
+
+        return {
+          invitation: response.data!.invitation,
+          document,
+          catalog: response.data!.catalog,
+          session: response.data!.session,
+          currentVersion: response.data!.currentVersion,
+          pendingOperations: queuedOperations,
+          isLoading: false,
+          isSaving: false,
+          error: null,
+          lastSavedAt: new Date().toISOString(),
+        }
+      })
+    })()
+
+    try {
+      await activeFlushPromise
     } catch (error) {
-      set({
+      set((state) => ({
         isSaving: false,
         error: getPublicErrorMessage(error, 'Perubahan editor belum bisa disimpan.'),
-      })
+        pendingOperations: [...operationsToSave, ...state.pendingOperations],
+      }))
       throw error
+    } finally {
+      activeFlushPromise = null
     }
   },
   reorderPages: async (invitationId, orderedUniqueIds) => {
@@ -388,6 +424,32 @@ export const useSapatamuEditorStore = create<SapatamuEditorStore>((set, get) => 
       set({
         isSaving: false,
         error: getPublicErrorMessage(error, 'Layout belum bisa dihapus.'),
+      })
+      throw error
+    }
+  },
+  applyTheme: async (invitationId, themeId) => {
+    const state = get()
+    if (state.pendingOperations.length > 0) {
+      await state.flushPending(invitationId)
+    }
+
+    set({ isSaving: true, error: null })
+
+    try {
+      const response = await sapatamuApplyEditorTheme<SapatamuEditorHydrationResponse>(invitationId, {
+        baseVersion: get().currentVersion,
+        themeId,
+      })
+      if (!response.data) {
+        throw new Error('Response apply theme kosong.')
+      }
+
+      setResponseState(set, response.data)
+    } catch (error) {
+      set({
+        isSaving: false,
+        error: getPublicErrorMessage(error, 'Tema belum bisa diterapkan.'),
       })
       throw error
     }

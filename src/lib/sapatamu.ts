@@ -70,6 +70,7 @@ export function createDefaultEvents(): SapatamuEvent[] {
 export function createDefaultDraftState(): DraftWizardState {
   return {
     step: 0,
+    invitationName: '',
     slugCandidate: '',
     themeId: '',
     selectedPackageId: null,

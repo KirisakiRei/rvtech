@@ -1,4 +1,5 @@
 import type { WeddingThemePreset } from '@/types/wedding'
+import { PUBLIC_SOURCE_THEME_PRESETS } from './sapatamu-source-themes'
 
 export const BRAND = {
   name: 'Rekavia',
@@ -19,7 +20,7 @@ export const PRODUCTS = [
     color: '#C45D3E',
     image: '/images/hero-sapatamu.png',
     href: '/produk/sapatamu',
-    highlights: ['8 Tema Premium', 'Live Preview Editor', 'RSVP & Buku Tamu', 'Broadcast WhatsApp', 'Digital Angpao', 'Background Music'],
+    highlights: ['10 Tema Premium', 'Live Preview Editor', 'RSVP & Buku Tamu', 'Broadcast WhatsApp', 'Digital Angpao', 'Background Music'],
   },
   {
     id: 'etalasepro',
@@ -72,7 +73,7 @@ export const PRODUCT_PRICING: Record<string, {
       price: 150000,
       period: '/tahun',
       features: [
-        { text: 'Pilihan 8 tema premium', included: true },
+        { text: 'Pilihan 10 tema premium', included: true },
         { text: 'Formulir RSVP terintegrasi', included: true },
         { text: 'Galeri foto (maks. 10)', included: true },
         { text: 'Countdown timer acara', included: true },
@@ -90,7 +91,7 @@ export const PRODUCT_PRICING: Record<string, {
       period: '/tahun',
       badge: 'Populer',
       features: [
-        { text: 'Pilihan 8 tema premium', included: true },
+        { text: 'Pilihan 10 tema premium', included: true },
         { text: 'Formulir RSVP terintegrasi', included: true },
         { text: 'Galeri foto unlimited', included: true },
         { text: 'Countdown timer acara', included: true },
@@ -258,6 +259,33 @@ export const WEDDING_THEMES: WeddingThemePreset[] = [
     bgPattern: 'batik',
   },
   {
+    id: 'premium1',
+    name: 'Munggah Sriwijaya - Auburn Red',
+    group: 'Budaya',
+    description: 'Tema adat Palembang bernuansa auburn red dengan ornamen Sriwijaya',
+    previewImage: '/sapatamu-themes/premium1/original/pictures/picture_17393765661722ej1do.jpeg',
+    primaryColor: '#4a1a1f',
+    secondaryColor: '#341215',
+    accentColor: '#a97f71',
+    fontHeading: 'Gautreaux',
+    fontBody: 'Fahkwang',
+    bgPattern: 'batik',
+  },
+  {
+    id: 'sarune-batak-sangria',
+    name: 'Sarune Batak - Sangria',
+    group: 'Budaya',
+    description: 'Tema adat Batak bernuansa sangria dengan ornamen Sarune',
+    previewImage: '/sapatamu-themes/sarune-batak-sangria/original/pictures/picture_1739377539664wswbzef.jpeg',
+    primaryColor: '#7b0f24',
+    secondaryColor: '#230c10',
+    accentColor: '#b55963',
+    fontHeading: 'Annabelle-JF',
+    fontBody: 'Fahkwang',
+    bgPattern: 'batik',
+  },
+  ...PUBLIC_SOURCE_THEME_PRESETS,
+  {
     id: 'modern',
     name: 'Urban Chic',
     group: 'Kontemporer',
@@ -358,7 +386,12 @@ export const CMS_SIDEBAR_LINKS = {
   ],
   admin: [
     { label: 'Dashboard', href: '/admin', icon: 'LayoutDashboard' },
-    { label: 'Tenants', href: '/admin/tenants', icon: 'Users' },
+    { label: 'Users', href: '/admin/users', icon: 'Users' },
+    { label: 'Finance', href: '/admin/finance', icon: 'CreditCard' },
+    { label: 'Vouchers', href: '/admin/vouchers', icon: 'Wallet' },
+    { label: 'Products', href: '/admin/products', icon: 'Package' },
+    { label: 'Audit Log', href: '/admin/audit-logs', icon: 'History' },
+    { label: 'Settings', href: '/admin/settings', icon: 'Settings' },
   ],
 } as const
 

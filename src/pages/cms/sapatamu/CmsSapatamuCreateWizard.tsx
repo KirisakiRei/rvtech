@@ -24,7 +24,7 @@ import type {
   TierCategory,
 } from '@/types/sapatamu'
 
-const STEPS = ['Link', 'Theme', 'Profiles', 'Events', 'Finish']
+const STEPS = ['Invitation', 'Theme', 'Profiles', 'Events', 'Finish']
 let draftBootstrapPromise: Promise<string> | null = null
 
 type WizardProps = {
@@ -266,6 +266,19 @@ export function CmsSapatamuCreateWizard({ onClose }: WizardProps) {
         return (
           <div className="space-y-5">
             <div className="space-y-2">
+              <Label htmlFor="draft-invitation-name">Nama invitation</Label>
+              <Input
+                id="draft-invitation-name"
+                value={draft.invitationName}
+                onChange={(event) => updateDraftField('invitationName', event.target.value)}
+                placeholder="contoh: Ryan"
+                className="h-12 rounded-xl"
+              />
+              <p className="text-sm text-muted-foreground">
+                Nama ini akan dipakai sebagai judul di dashboard, manage, dan editor.
+              </p>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="draft-slug">Link undangan</Label>
               <Input
                 id="draft-slug"
@@ -366,7 +379,9 @@ export function CmsSapatamuCreateWizard({ onClose }: WizardProps) {
           <div className="space-y-5">
             <div className="rounded-[1.6rem] border border-border bg-card p-5">
               <p className="text-sm text-muted-foreground">Invitation siap dibuat</p>
-              <h3 className="text-2xl font-semibold text-foreground mt-2">{buildInvitationLabel(draft.profiles)}</h3>
+              <h3 className="text-2xl font-semibold text-foreground mt-2">
+                {draft.invitationName || buildInvitationLabel(draft.profiles)}
+              </h3>
               <p className="text-sm text-muted-foreground mt-2">{buildSlugPreview(draft.slugCandidate)}</p>
             </div>
 
