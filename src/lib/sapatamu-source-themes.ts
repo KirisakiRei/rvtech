@@ -9,7 +9,8 @@ export const PUBLIC_ADDITIONAL_SOURCE_THEME_IDS = [
   "cheerfulness-floralwhite",
   "javanese-magnolia-tan-mahogany",
   "polyanthus-linnea-light-coral",
-  "javanese-linnea-greenish-white"
+  "javanese-linnea-greenish-white",
+  "aishwarya-peonny"
 ] as const
 
 export const PUBLIC_SOURCE_THEME_DEFAULT_MUSIC: Record<string, string> = {
@@ -23,9 +24,54 @@ export const PUBLIC_SOURCE_THEME_DEFAULT_MUSIC: Record<string, string> = {
   "javanese-magnolia-tan-mahogany": "/sapatamu-themes/javanese-magnolia-tan-mahogany/original/musics/music_1686382733226zr3gavn.mp3",
   "polyanthus-linnea-light-coral": "/sapatamu-themes/polyanthus-linnea-light-coral/original/musics/music_17126553245316zz3fb4.mp3",
   "javanese-linnea-greenish-white": "/sapatamu-themes/javanese-linnea-greenish-white/original/musics/music_1724397443711rjlqq6q.mp3",
+  "aishwarya-peonny": "/sapatamu-themes/aishwarya-peonny/original/musics/SANDHAYU-SONG-Donkgedank-KASWOSIH-Backsound-Nusantara-Relaxing-Music.mp3",
+}
+
+export const PUBLIC_SOURCE_THEME_BACKDROPS: Record<string, string> = {
+  "malay-ethnic-red-ruby": "/sapatamu-themes/malay-ethnic-red-ruby/backgrounds/global.webp",
+  "cheerfulness-floralwhite": "/sapatamu-themes/cheerfulness-floralwhite/original/albums/album_1739376304266uhk38dc.jpeg",
+  "batak-ethnic-maroon-mistyrose": "/sapatamu-themes/batak-ethnic-maroon-mistyrose/original/albums/album_1739377546935mw3035u.jpeg",
+  "javanese-magnolia-tan-mahogany": "/sapatamu-themes/javanese-magnolia-tan-mahogany/original/albums/album_1739376941137biopu2q.jpeg",
+  "kabagyan-linnea-swan-white": "/sapatamu-themes/kabagyan-linnea-swan-white/original/albums/album_17598077602542pxdlir.jpeg",
+  "javanese-linnea-greenish-white": "/sapatamu-themes/javanese-linnea-greenish-white/original/albums/album_1749014798768jt6f7l2.jpeg",
+  "polyanthus-linnea-light-coral": "/sapatamu-themes/polyanthus-linnea-light-coral/original/albums/album_1739377682445s6d565n.jpeg",
+  "hollyhock-nauli-sienna-ivory": "/sapatamu-themes/hollyhock-nauli-sienna-ivory/original/albums/album_1771052344518pm3um1d.jpeg",
+  "honeysuckle-seashell": "/sapatamu-themes/honeysuckle-seashell/original/albums/album_1739373844962xml672b.jpeg",
+  "calla-lily-plum-red-lead": "/sapatamu-themes/calla-lily-plum-red-lead/original/albums/album_1739424658768tq692ws.jpeg",
+  "aishwarya-peonny": "/sapatamu-themes/aishwarya-peonny/original/pictures/Heritage-Background-Home.webp",
 }
 
 export const PUBLIC_SOURCE_THEME_FONTS: SapatamuEditorFontCatalogItem[] = [
+  {
+    "id": "font-aishwarya-belgiano",
+    "name": "Belgiano Serif",
+    "fontUrl": "/sapatamu-themes/aishwarya-peonny/original/fonts/8543Belgiano-Serif.woff2",
+    "category": "serif"
+  },
+  {
+    "id": "font-aishwarya-neutica",
+    "name": "Neutica",
+    "fontUrl": "/sapatamu-themes/aishwarya-peonny/original/fonts/3858Neutica.woff2",
+    "category": "display"
+  },
+  {
+    "id": "font-aishwarya-pinyon",
+    "name": "Pinyon Script",
+    "fontUrl": "https://fonts.googleapis.com/css2?family=Pinyon+Script&display=swap",
+    "category": "script"
+  },
+  {
+    "id": "font-aishwarya-lora",
+    "name": "Lora",
+    "fontUrl": "https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600&display=swap",
+    "category": "serif"
+  },
+  {
+    "id": "font-aishwarya-poppins",
+    "name": "Poppins",
+    "fontUrl": "https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap",
+    "category": "sans"
+  },
   {
     "id": "font-calla-lily-plum-open-sans",
     "name": "Open Sans",
@@ -444,11 +490,24 @@ export const PUBLIC_SOURCE_THEME_PRESETS: WeddingThemePreset[] = [
     "group": "Budaya",
     "description": "Tema signature Calla Lily Plum bernuansa red lead.",
     "previewImage": "/sapatamu-themes/calla-lily-plum-red-lead/original/pictures/picture_1739338788188xkqpvsi.jpeg",
-    "primaryColor": "#f0b63b",
-    "secondaryColor": "#e8d775",
-    "accentColor": "#d7ff87",
+    "primaryColor": "#852222",
+    "secondaryColor": "#4f1212",
+    "accentColor": "#876824",
     "fontHeading": "Tangier",
     "fontBody": "Poppins",
     "bgPattern": "batik"
+  },
+  {
+    "id": "aishwarya-peonny",
+    "name": "Aishwarya Peonny",
+    "group": "Vintage",
+    "description": "Tema vintage Aishwarya Peonny dari Heritage Series dengan layout floral klasik.",
+    "previewImage": "/sapatamu-themes/aishwarya-peonny/original/pictures/Heritage-Background-Home.webp",
+    "primaryColor": "#a54141",
+    "secondaryColor": "#46402a",
+    "accentColor": "#c4a15d",
+    "fontHeading": "Pinyon Script",
+    "fontBody": "Lora",
+    "bgPattern": "floral"
   }
 ]

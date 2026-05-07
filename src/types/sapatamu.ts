@@ -305,6 +305,7 @@ export interface SapatamuWorkspace {
       activatedAt: string | null
     }
     giftAccounts: SapatamuGiftAccount[]
+    giftAddress: string
     packageOverview: {
       currentPackage: (SapatamuPackageCatalogItem & {
         features?: Record<string, unknown> | null
@@ -438,7 +439,24 @@ export interface SapatamuEditorGalleryElement {
   title: string
   items: string[]
   columns: number
-  variant?: 'bento-feature-left' | 'bento-feature-right' | 'bento-banner' | 'bento-center' | 'bento-mosaic'
+  variant?: 'gallery-stack' | 'gallery-duo' | 'gallery-hero-trio' | 'gallery-quad-offset' | 'gallery-quad-grid' | 'gallery-mosaic-six'
+  frameSettings?: {
+    columns?: number
+    rowHeight?: number
+    gap?: number
+    slots?: Array<{
+      colStart?: number
+      rowStart?: number
+      colSpan?: number
+      rowSpan?: number
+    }>
+  }
+  frameSettingsByVariant?: Partial<Record<NonNullable<SapatamuEditorGalleryElement['variant']>, SapatamuEditorGalleryElement['frameSettings']>>
+  imageAdjustments?: Array<{
+    x?: number
+    y?: number
+    zoom?: number
+  }>
   padding: SapatamuEditorPadding
   animation: SapatamuEditorAnimation
 }
@@ -672,6 +690,7 @@ export interface SapatamuEditorDocumentV3 {
       activationState: 'inactive' | 'active'
     }
     giftAccounts: SapatamuGiftAccount[]
+    giftAddress: string
     lastEditedAtDisplay: string | null
     activatedAtDisplay: string | null
   }

@@ -52,6 +52,7 @@ export type WeddingThemeId =
   | 'javanese-magnolia-tan-mahogany'
   | 'polyanthus-linnea-light-coral'
   | 'javanese-linnea-greenish-white'
+  | 'aishwarya-peonny'
 
 export interface WeddingThemePreset {
   id: WeddingThemeId

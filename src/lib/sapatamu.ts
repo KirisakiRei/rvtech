@@ -4,6 +4,7 @@ import type {
   SapatamuEvent,
   SapatamuProfile,
   SapatamuThemeCatalogItem,
+  TierCategory,
   WorkspaceGuest,
   SapatamuWorkspace,
 } from '@/types/sapatamu'
@@ -96,11 +97,37 @@ export function formatHumanDate(date: string): string {
   })
 }
 
-export function resolveThemeGroup(theme: SapatamuThemeCatalogItem) {
-  const tierCategory = typeof theme.metadata?.tierCategory === 'string' ? theme.metadata.tierCategory : ''
+export function resolveThemeTier(theme: SapatamuThemeCatalogItem | undefined): 'Basic' | 'Signature' | 'Vintage' {
+  const tierCategory = typeof theme?.metadata?.tierCategory === 'string' ? theme.metadata.tierCategory : ''
   if (tierCategory === 'premium') return 'Signature'
   if (tierCategory === 'vintage') return 'Vintage'
   return 'Basic'
+}
+
+export function resolveThemeTierCategory(theme: SapatamuThemeCatalogItem | undefined): TierCategory {
+  const tierCategory = typeof theme?.metadata?.tierCategory === 'string' ? theme.metadata.tierCategory : ''
+  if (tierCategory === 'premium' || tierCategory === 'vintage') return tierCategory
+  return 'basic'
+}
+
+export function resolveThemeReleaseStatus(theme: SapatamuThemeCatalogItem | undefined): 'available' | 'comingSoon' {
+  const releaseStatus = theme?.metadata?.releaseStatus
+  if (releaseStatus === 'available' || releaseStatus === 'comingSoon') return releaseStatus
+  return resolveThemeTierCategory(theme) === 'premium' ? 'available' : 'comingSoon'
+}
+
+export function isThemeComingSoon(theme: SapatamuThemeCatalogItem | undefined) {
+  return resolveThemeReleaseStatus(theme) === 'comingSoon'
+}
+
+export function getThemeReleaseLabel(theme: SapatamuThemeCatalogItem | undefined) {
+  const label = theme?.metadata?.availabilityLabel
+  if (typeof label === 'string' && label.trim()) return label
+  return isThemeComingSoon(theme) ? 'Coming soon' : 'Available'
+}
+
+export function resolveThemeGroup(theme: SapatamuThemeCatalogItem) {
+  return resolveThemeTier(theme)
 }
 
 export function getThemePreset(code: string) {

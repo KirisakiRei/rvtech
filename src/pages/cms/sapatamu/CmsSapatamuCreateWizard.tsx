@@ -12,8 +12,11 @@ import {
   buildSlugPreview,
   createDefaultDraftState,
   formatHumanDate,
+  getThemeReleaseLabel,
   getThemePreset,
+  isThemeComingSoon,
   resolveThemeGroup,
+  resolveThemeTierCategory,
 } from '@/lib/sapatamu'
 import { cn } from '@/lib/utils'
 import { useDashboardStore } from '@/stores/dashboardStore'
@@ -31,12 +34,6 @@ type WizardProps = {
   onClose: () => void
 }
 
-function resolveThemeTier(theme: SapatamuThemeCatalogItem | undefined): TierCategory {
-  const tier = typeof theme?.metadata?.tierCategory === 'string' ? theme.metadata.tierCategory : ''
-  if (tier === 'premium' || tier === 'vintage') return tier
-  return 'basic'
-}
-
 function ThemeChooser({
   themes,
   selectedThemeId,
@@ -47,14 +44,15 @@ function ThemeChooser({
   onSelect: (id: string) => void
 }) {
   const selectedTheme = themes.find((item) => item.id === selectedThemeId)
-  const [activeCategory, setActiveCategory] = useState<TierCategory>(resolveThemeTier(selectedTheme))
+  const [activeCategory, setActiveCategory] = useState<TierCategory>(resolveThemeTierCategory(selectedTheme))
 
   useEffect(() => {
-    setActiveCategory(resolveThemeTier(selectedTheme))
+    setActiveCategory(resolveThemeTierCategory(selectedTheme))
   }, [selectedTheme])
 
   const categories: TierCategory[] = ['basic', 'premium', 'vintage']
-  const visibleThemes = themes.filter((item) => resolveThemeTier(item) === activeCategory)
+  const visibleThemes = themes.filter((item) => resolveThemeTierCategory(item) === activeCategory)
+  const activeCategoryComingSoon = activeCategory !== 'premium'
 
   return (
     <div className="space-y-5">
@@ -69,26 +67,42 @@ function ThemeChooser({
               activeCategory === category ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground',
             )}
           >
-            {category === 'basic' ? 'Basic' : category === 'premium' ? 'Signature' : 'Vintage'}
+            <span>{category === 'basic' ? 'Basic' : category === 'premium' ? 'Signature' : 'Vintage'}</span>
+            {category !== 'premium' ? (
+              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                Soon
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
+
+      {activeCategoryComingSoon ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Tema {activeCategory === 'basic' ? 'Basic' : 'Vintage'} sedang disiapkan. Untuk sementara pilih tema Signature/Premium.
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {visibleThemes.map((theme) => {
           const preset = getThemePreset(theme.code)
           const isActive = selectedThemeId === theme.id
+          const isComingSoon = isThemeComingSoon(theme)
 
           return (
             <button
               key={theme.id}
               type="button"
-              onClick={() => onSelect(theme.id)}
+              onClick={() => {
+                if (!isComingSoon) onSelect(theme.id)
+              }}
+              disabled={isComingSoon}
               className={cn(
                 'rounded-[1.4rem] border p-3 text-left transition-all duration-300',
                 isActive
                   ? 'border-accent bg-accent/5 shadow-lg shadow-accent/10'
                   : 'border-border bg-card hover:border-accent/40 hover:-translate-y-0.5',
+                isComingSoon && 'cursor-not-allowed opacity-65 hover:translate-y-0 hover:border-border',
               )}
             >
               <div
@@ -100,8 +114,8 @@ function ThemeChooser({
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[10px] tracking-[0.16em] uppercase opacity-60">{resolveThemeGroup(theme)}</p>
-                  <Badge className="border-0 bg-white/75 text-foreground">
-                    {activeCategory === 'basic' ? 'Basic' : activeCategory === 'premium' ? 'Signature' : 'Vintage'}
+                  <Badge className={cn('border-0 bg-white/75 text-foreground', isComingSoon && 'bg-amber-100 text-amber-800')}>
+                    {isComingSoon ? getThemeReleaseLabel(theme) : activeCategory === 'premium' ? 'Signature' : resolveThemeGroup(theme)}
                   </Badge>
                 </div>
                 <div>
@@ -221,6 +235,7 @@ export function CmsSapatamuCreateWizard({ onClose }: WizardProps) {
 
   const currentStep = draft.step
   const selectedTheme = themes.find((item) => item.id === draft.themeId) ?? themes[0] ?? null
+  const selectedThemeComingSoon = isThemeComingSoon(selectedTheme ?? undefined)
 
   const updateDraftField = <K extends keyof typeof draft>(key: K, value: (typeof draft)[K]) => {
     patchLocal({ [key]: value } as Partial<typeof draft>)
@@ -388,7 +403,12 @@ export function CmsSapatamuCreateWizard({ onClose }: WizardProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="rounded-2xl border border-border bg-card p-5">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Theme</p>
-                <p className="text-base font-semibold text-foreground mt-3">{selectedTheme?.name ?? 'Belum dipilih'}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <p className="text-base font-semibold text-foreground">{selectedTheme?.name ?? 'Belum dipilih'}</p>
+                  {selectedThemeComingSoon ? (
+                    <Badge className="border-0 bg-amber-100 text-amber-800">{getThemeReleaseLabel(selectedTheme ?? undefined)}</Badge>
+                  ) : null}
+                </div>
                 <p className="text-sm text-muted-foreground mt-2">
                   {selectedTheme ? resolveThemeGroup(selectedTheme) : 'Pilih tema sebelum menyelesaikan wizard'}
                 </p>
@@ -403,6 +423,12 @@ export function CmsSapatamuCreateWizard({ onClose }: WizardProps) {
                 </p>
               </div>
             </div>
+
+            {selectedThemeComingSoon ? (
+              <div className="rounded-[1.6rem] border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
+                Tema ini belum dibuka untuk pembuatan invitation. Silakan kembali ke step Theme dan pilih Signature/Premium.
+              </div>
+            ) : null}
 
             <div className="rounded-[1.6rem] border border-accent/20 bg-accent/5 p-5">
               <div className="flex items-center gap-2">
@@ -488,12 +514,12 @@ export function CmsSapatamuCreateWizard({ onClose }: WizardProps) {
               </Button>
             )}
             {currentStep < STEPS.length - 1 ? (
-              <Button onClick={() => void handleNext()} disabled={isSaving}>
+              <Button onClick={() => void handleNext()} disabled={isSaving || (currentStep === 1 && selectedThemeComingSoon)}>
                 Next
                 <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
-              <Button onClick={() => void handleFinish()} disabled={isSaving}>
+              <Button onClick={() => void handleFinish()} disabled={isSaving || selectedThemeComingSoon}>
                 {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Finish & Manage
               </Button>

@@ -2,13 +2,14 @@ import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useStat
 import { useParams, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import useEmblaCarousel from 'embla-carousel-react'
+import Lightbox from 'yet-another-react-lightbox'
 import { MapPin, Clock, Heart, Send, ChevronDown, Music, VolumeX } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { resolveApiAssetUrl } from '@/lib/api'
 import { BRAND, WEDDING_THEMES } from '@/lib/constants'
-import { PUBLIC_ADDITIONAL_SOURCE_THEME_IDS, PUBLIC_SOURCE_THEME_DEFAULT_MUSIC } from '@/lib/sapatamu-source-themes'
+import { PUBLIC_ADDITIONAL_SOURCE_THEME_IDS, PUBLIC_SOURCE_THEME_BACKDROPS, PUBLIC_SOURCE_THEME_DEFAULT_MUSIC } from '@/lib/sapatamu-source-themes'
 import { dataCreate, dataDetail, dataList } from '@/lib/api'
 import { PUBLIC_SAPATAMU_EDITOR_FONTS } from '@/lib/sapatamu-editor-fonts'
 import { BackgroundHeroOverlay, PreviewPage } from '@/pages/cms/sapatamu/CmsSapatamuEditor'
@@ -81,6 +82,55 @@ function buildYouTubePlayerUrl(url: string) {
   const id = getYouTubeVideoId(url)
   if (!id) return ''
   return `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&enablejsapi=1&loop=1&playlist=${id}`
+}
+
+function parseCssColor(color: string | null | undefined): { r: number; g: number; b: number } | null {
+  if (!color) return null
+  const source = color.trim()
+  if (/^rgba?\(/i.test(source)) {
+    const [r, g, b] = source.match(/[\d.]+/g)?.map((part) => Number.parseFloat(part)) ?? []
+    if ([r, g, b].every((value) => Number.isFinite(value))) {
+      return {
+        r: Math.max(0, Math.min(r, 255)),
+        g: Math.max(0, Math.min(g, 255)),
+        b: Math.max(0, Math.min(b, 255)),
+      }
+    }
+  }
+
+  const normalized = source.replace('#', '')
+  const full = normalized.length === 3
+    ? normalized.split('').map((char) => char + char).join('')
+    : normalized.slice(0, 6)
+  if (!/^[0-9a-f]{6}$/i.test(full)) return null
+
+  return {
+    r: Number.parseInt(full.slice(0, 2), 16),
+    g: Number.parseInt(full.slice(2, 4), 16),
+    b: Number.parseInt(full.slice(4, 6), 16),
+  }
+}
+
+function colorWithAlpha(color: string | null | undefined, alpha: number) {
+  const rgb = parseCssColor(color)
+  if (!rgb) return `rgb(255 255 255 / ${Math.round(alpha * 100)}%)`
+  return `rgb(${rgb.r} ${rgb.g} ${rgb.b} / ${Math.round(Math.max(0, Math.min(alpha, 1)) * 100)}%)`
+}
+
+function isLightColor(color: string | null | undefined) {
+  const rgb = parseCssColor(color)
+  if (!rgb) return false
+  const luminance = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255
+  return luminance > 0.62
+}
+
+function navIconFilterForBackground(color: string | null | undefined) {
+  return isLightColor(color) ? 'brightness(0) saturate(100%)' : 'brightness(0) invert(1)'
+}
+
+function getEditorPageBackground(page: SapatamuEditorPage | undefined) {
+  if (!page || page.data.backgroundDetails?.type === 'video') return ''
+  return page.data.background || ''
 }
 
 function reconcilePublicDocument(
@@ -296,6 +346,11 @@ export function TenantWeddingPage() {
   const [weddingData, setWeddingData] = useState<Partial<WeddingDetail>>(DEFAULT_WEDDING_DATA)
   const [editorDocument, setEditorDocument] = useState<SapatamuEditorDocumentV3 | null>(null)
   const [gallery, setGallery] = useState<InvitationMediaRow[]>([])
+  const [galleryLightbox, setGalleryLightbox] = useState<{ open: boolean; index: number; items: string[] }>({
+    open: false,
+    index: 0,
+    items: [],
+  })
   const [guestMessages, setGuestMessages] = useState<Array<{ id: string; guestName: string; message: string; createdAt?: string }>>([])
   const [rsvpStatus, setRsvpStatus] = useState<'hadir' | 'tidak' | 'ragu' | ''>('')
   const [rsvpName, setRsvpName] = useState(guestName)
@@ -523,6 +578,7 @@ export function TenantWeddingPage() {
   }
 
   const handleOpenInvitation = () => {
+    setIsOpen(true)
     // 1. Scroll to salam page via Embla
     const salamIndex = activeEditorPages.findIndex((p) => p.family === 'salam')
     if (salamIndex >= 0) {
@@ -556,6 +612,20 @@ export function TenantWeddingPage() {
       }
     } else if (resolvedAudioMusicUrl) {
       playAudioUrl(resolvedAudioMusicUrl)
+    }
+  }
+
+  const handleVintageNavigate = (target: string) => {
+    const key = target.replace(/^#/, '').toLowerCase()
+    const index = activeEditorPages.findIndex((page) => (
+      page.family.toLowerCase() === key
+      || page.layoutCode.toLowerCase().includes(key)
+      || page.slug.toLowerCase().includes(key)
+      || (key === 'gift' && page.family.toLowerCase() === 'gift')
+      || (key === 'rsvp' && page.family.toLowerCase() === 'rsvp')
+    ))
+    if (index >= 0) {
+      publicEmblaApi?.scrollTo(index)
     }
   }
 
@@ -647,24 +717,37 @@ export function TenantWeddingPage() {
   if (editorDocument && invitationId) {
     const invitationLink = `https://${BRAND.domain}/${slug}`
     const fallbackImages = gallery.map((item) => item.url)
+    const galleryLightboxSlides = galleryLightbox.items.map((item) => ({ src: resolveApiAssetUrl(item) }))
+    const openGalleryLightbox = (index: number, items = fallbackImages) => {
+      if (!items.length) return
+      setGalleryLightbox({ open: true, index, items })
+    }
     const isSourceThemeDocument = SOURCE_THEME_IDS.has(editorDocument.selectedTheme)
+    const isAishwaryaVintageDocument = editorDocument.selectedTheme === 'aishwarya-peonny'
 
     if (isSourceThemeDocument) {
       const globalBgUrl = editorDocument.editor.globalBackground
       const globalBgType = editorDocument.editor.globalBackgroundDetails?.type
-      const hasDynamicBg = globalBgUrl && globalBgType !== 'video'
+      const activePageBackground = getEditorPageBackground(activeEditorPages[publicPageIndex])
+      const stageBackdropUrl = PUBLIC_SOURCE_THEME_BACKDROPS[editorDocument.selectedTheme]
+      const stageBackgroundUrl = stageBackdropUrl || activePageBackground || (globalBgUrl && globalBgType !== 'video' ? globalBgUrl : '')
       const backgroundHero = (editorDocument.editor.globalBackgroundDetails as { hero?: Parameters<typeof BackgroundHeroOverlay>[0]['hero'] }).hero
+      const stageBaseColor = theme.primaryColor || editorDocument.editor.colorPalette.surface || editorDocument.editor.colorPalette.canvas
+      const stageAccentColor = theme.accentColor || editorDocument.editor.colorPalette.accent
+      const navActiveColor = stageAccentColor
+      const navInactiveColor = colorWithAlpha(stageBaseColor, 0.18)
+      const navShellColor = colorWithAlpha(stageBaseColor, 0.36)
 
-      const publicStageStyle: CSSProperties = hasDynamicBg
+      const publicStageStyle: CSSProperties = stageBackgroundUrl
         ? {
-            backgroundColor: editorDocument.editor.colorPalette.canvas,
-            backgroundImage: `url(${resolveApiAssetUrl(globalBgUrl!)})`,
+            backgroundColor: stageBaseColor,
+            backgroundImage: `linear-gradient(${colorWithAlpha(stageBaseColor, 0.2)}, ${colorWithAlpha(stageBaseColor, 0.2)}), url(${resolveApiAssetUrl(stageBackgroundUrl)})`,
             backgroundPosition: 'center center',
             backgroundRepeat: 'no-repeat',
-            backgroundSize: 'contain',
+            backgroundSize: 'cover',
           }
         : {
-            backgroundColor: editorDocument.editor.colorPalette.canvas,
+            background: `linear-gradient(135deg, ${stageBaseColor}, ${editorDocument.editor.colorPalette.surface || stageBaseColor})`,
             backgroundPosition: 'center center',
           }
 
@@ -686,13 +769,18 @@ export function TenantWeddingPage() {
                     invitationLink={invitationLink}
                     fonts={PUBLIC_SAPATAMU_EDITOR_FONTS}
                     fallbackImages={fallbackImages}
-                    onOpenLightbox={() => undefined}
+                    onOpenLightbox={openGalleryLightbox}
                     isEditing={false}
                     onOpen={handleOpenInvitation}
                     rsvpInitialName={guestName}
                     rsvpMessages={guestMessages}
                     onRsvpSubmitted={(message) => setGuestMessages((current) => [message, ...current])}
                     giftAccounts={editorDocument.settings.giftAccounts}
+                    giftAddress={editorDocument.settings.giftAddress}
+                    isInvitationOpen={!isAishwaryaVintageDocument || isOpen}
+                    isMusicPlaying={isMusicPlaying}
+                    onMusicToggle={handleMusicToggle}
+                    onVintageNavigate={handleVintageNavigate}
                   />
                 </div>
               ))}
@@ -707,10 +795,15 @@ export function TenantWeddingPage() {
             />
           ) : null}
 
-          {editorDocument.editor.navMenu.enabled && activeEditorPages.length > 1 ? (
-            <nav className="sapatamu-public-signature-nav" aria-label="Navigasi undangan">
+          {editorDocument.editor.navMenu.enabled && activeEditorPages.length > 1 && !isAishwaryaVintageDocument ? (
+            <nav
+              className="sapatamu-public-signature-nav"
+              aria-label="Navigasi undangan"
+              style={{ background: navShellColor }}
+            >
               {activeEditorPages.map((page, index) => {
                 const isActive = index === publicPageIndex
+                const buttonColor = isActive ? navActiveColor : navInactiveColor
                 return (
                   <button
                     key={page.uniqueId}
@@ -721,10 +814,9 @@ export function TenantWeddingPage() {
                     title={page.title}
                     onClick={() => publicEmblaApi?.scrollTo(index)}
                     style={{
-                      backgroundColor: isActive
-                        ? (editorDocument.editor.navMenu.activeColor || editorDocument.editor.colorPalette.accent)
-                        : (editorDocument.editor.navMenu.inactiveColor || editorDocument.editor.colorPalette.accentSoft),
-                    }}
+                      backgroundColor: buttonColor,
+                      '--sapatamu-nav-icon-filter': navIconFilterForBackground(buttonColor),
+                    } as CSSProperties}
                   >
                     <img src={getSourceThemeNavIcon(editorDocument.selectedTheme, page)} alt="" className="size-4" />
                   </button>
@@ -750,16 +842,22 @@ export function TenantWeddingPage() {
             />
           ) : null}
           {/* Floating music toggle button */}
-          {canPlayMusic || audioRef.current || youtubeEmbedSrc ? (
+          {(canPlayMusic || audioRef.current || youtubeEmbedSrc) && !isAishwaryaVintageDocument ? (
             <button
               type="button"
-              className="fixed bottom-6 right-6 z-50 flex size-11 items-center justify-center rounded-full bg-white/20 text-white shadow-lg backdrop-blur-sm transition hover:bg-white/30"
+              className="sapatamu-public-music-toggle fixed right-6 z-50 flex size-11 items-center justify-center rounded-full bg-white/20 text-white shadow-lg backdrop-blur-sm transition hover:bg-white/30"
               onClick={handleMusicToggle}
               aria-label={isMusicPlaying ? 'Matikan musik' : 'Putar musik'}
             >
               {isMusicPlaying ? <Music className="size-4" /> : <VolumeX className="size-4" />}
             </button>
           ) : null}
+          <Lightbox
+            open={galleryLightbox.open}
+            close={() => setGalleryLightbox((current) => ({ ...current, open: false }))}
+            index={galleryLightbox.index}
+            slides={galleryLightboxSlides}
+          />
         </div>
       )
     }
@@ -776,15 +874,26 @@ export function TenantWeddingPage() {
             invitationLink={invitationLink}
             fonts={PUBLIC_SAPATAMU_EDITOR_FONTS}
             fallbackImages={fallbackImages}
-            onOpenLightbox={() => undefined}
+            onOpenLightbox={openGalleryLightbox}
             isEditing={false}
             onOpen={handleOpenInvitation}
             rsvpInitialName={guestName}
             rsvpMessages={guestMessages}
             onRsvpSubmitted={(message) => setGuestMessages((current) => [message, ...current])}
             giftAccounts={editorDocument.settings.giftAccounts}
+            giftAddress={editorDocument.settings.giftAddress}
+            isInvitationOpen={isOpen}
+            isMusicPlaying={isMusicPlaying}
+            onMusicToggle={handleMusicToggle}
+            onVintageNavigate={handleVintageNavigate}
           />
         ))}
+        <Lightbox
+          open={galleryLightbox.open}
+          close={() => setGalleryLightbox((current) => ({ ...current, open: false }))}
+          index={galleryLightbox.index}
+          slides={galleryLightboxSlides}
+        />
       </div>
     )
   }

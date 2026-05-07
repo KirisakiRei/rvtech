@@ -122,6 +122,7 @@ export function CmsSapatamuWorkspace() {
     musicValue: '',
     extraYoutube: '',
     giftAccounts: [createEmptyGiftAccount()] as SapatamuGiftAccount[],
+    giftAddress: '',
   })
   const [messageSearch, setMessageSearch] = useState('')
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -151,6 +152,7 @@ export function CmsSapatamuWorkspace() {
       giftAccounts: workspace.settings.giftAccounts.length
         ? workspace.settings.giftAccounts
         : [createEmptyGiftAccount()],
+      giftAddress: workspace.settings.giftAddress ?? '',
     })
   }, [workspace])
 
@@ -1034,11 +1036,20 @@ export function CmsSapatamuWorkspace() {
           <AccordionItem value="gift" className="rounded-[1.4rem] border border-border bg-card px-5">
             <AccordionTrigger className="py-4">
               <div className="text-left">
-                <p className="font-semibold text-foreground">No Rekening</p>
-                <p className="text-sm text-muted-foreground mt-1">Maksimal dua rekening untuk bagian kirim hadiah.</p>
+                <p className="font-semibold text-foreground">Hadiah</p>
+                <p className="text-sm text-muted-foreground mt-1">Atur rekening dan alamat pengiriman kado.</p>
               </div>
             </AccordionTrigger>
             <AccordionContent className="pb-5 space-y-4">
+              <div className="rounded-2xl bg-muted/35 p-4 space-y-3">
+                <Label className="text-sm font-medium text-foreground">Alamat Pengiriman Kado</Label>
+                <Textarea
+                  value={settingsForm.giftAddress}
+                  onChange={(event) => setSettingsForm((current) => ({ ...current, giftAddress: event.target.value }))}
+                  placeholder="Nama penerima, alamat lengkap, nomor rumah, kecamatan, kota, kode pos."
+                  className="min-h-24 rounded-xl bg-background"
+                />
+              </div>
               {settingsForm.giftAccounts.map((account, index) => (
                 <div key={`${account.bankName}-${index}`} className="rounded-2xl bg-muted/35 p-4 space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1069,7 +1080,7 @@ export function CmsSapatamuWorkspace() {
                   <Plus className="w-4 h-4 mr-2" />
                   Tambah Rekening
                 </Button>
-                <Button onClick={() => void handleSaveSettings()} disabled={isSaving}>Save Rekening</Button>
+                <Button onClick={() => void handleSaveSettings()} disabled={isSaving}>Save Hadiah</Button>
               </div>
             </AccordionContent>
           </AccordionItem>

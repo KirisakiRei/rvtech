@@ -17,6 +17,7 @@ import {
 } from '@/lib/api'
 import { CMS_SIDEBAR_LINKS } from '@/lib/constants'
 import { PreviewPage } from '@/pages/cms/sapatamu/CmsSapatamuEditor'
+import { GALLERY_LAYOUT_VARIANTS, getGalleryFrameLayout, getGalleryLayoutVariant, getGallerySlotFrame, getGalleryVariantFrameSettings } from '@/pages/cms/sapatamu/editor/gallery-layouts'
 import { stripEditorHtml } from '@/pages/cms/sapatamu/editor/editor-utils'
 import type {
   AdminEditorLayoutTemplate,
@@ -312,6 +313,65 @@ function DefaultContentInspector(props: {
   )
 }
 
+function GalleryFrameInspector(props: {
+  elementKey: string
+  element: Record<string, unknown>
+  onChange: (path: string, value: unknown) => void
+}) {
+  const variant = getGalleryLayoutVariant(String(props.element.variant ?? '')).id
+  const frameSettingsByVariant = isPlainRecord(props.element.frameSettingsByVariant) ? props.element.frameSettingsByVariant : {}
+  const frameSettings = getGalleryVariantFrameSettings(variant, frameSettingsByVariant)
+  const frameLayout = getGalleryFrameLayout(variant, frameSettings)
+  const updateFrameSettings = (patch: Record<string, unknown>) => {
+    props.onChange(`${props.elementKey}.frameSettingsByVariant.${variant}`, { ...frameSettings, ...patch })
+  }
+  const updateSlot = (index: number, patch: Record<string, unknown>) => {
+    const slots = Array.from({ length: getGalleryLayoutVariant(variant).slotCount }, (_, slotIndex) => {
+      const currentSlots = Array.isArray(frameSettings.slots) ? frameSettings.slots : []
+      return isPlainRecord(currentSlots[slotIndex]) ? currentSlots[slotIndex] : {}
+    })
+    slots[index] = { ...slots[index], ...patch }
+    updateFrameSettings({ slots })
+  }
+
+  return (
+    <div className="space-y-4 rounded-3xl border border-sky-100 bg-sky-50/70 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">Frame Gallery</p>
+          <p className="mt-1 text-xs leading-5 text-sky-900/75">
+            Setting ini menjadi default per tema/template. User hanya menggeser foto di dalam frame.
+          </p>
+        </div>
+        <Button type="button" size="sm" variant="outline" className="rounded-xl bg-white" onClick={() => props.onChange(`${props.elementKey}.frameSettingsByVariant.${variant}`, {})}>
+          Reset
+        </Button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <DesignNumberInput label="Kolom Grid" value={frameLayout.columns} onChange={(value) => updateFrameSettings({ columns: value })} />
+        <DesignNumberInput label="Tinggi Row" value={frameLayout.rowHeight} onChange={(value) => updateFrameSettings({ rowHeight: value })} />
+        <DesignNumberInput label="Gap" value={frameLayout.gap} onChange={(value) => updateFrameSettings({ gap: value })} />
+      </div>
+      <div className="space-y-3">
+        {Array.from({ length: getGalleryLayoutVariant(variant).slotCount }, (_, index) => {
+          const frame = getGallerySlotFrame(variant, index, frameSettings)
+          return (
+            <div key={index} className="rounded-2xl bg-white p-3 shadow-sm">
+              <p className="mb-3 text-xs font-semibold text-slate-600">Frame Foto {index + 1}</p>
+              <div className="grid grid-cols-2 gap-3">
+                <DesignNumberInput label="Mulai Kolom" value={frame.colStart} onChange={(value) => updateSlot(index, { colStart: value })} />
+                <DesignNumberInput label="Mulai Baris" value={frame.rowStart} onChange={(value) => updateSlot(index, { rowStart: value })} />
+                <DesignNumberInput label="Lebar" value={frame.colSpan} onChange={(value) => updateSlot(index, { colSpan: value })} />
+                <DesignNumberInput label="Tinggi" value={frame.rowSpan} onChange={(value) => updateSlot(index, { rowSpan: value })} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function ElementDesignInspector(props: {
   elementKey: string
   element: Record<string, unknown>
@@ -393,20 +453,20 @@ function ElementDesignInspector(props: {
           {'size' in props.element && !canEditTypography ? <DesignSliderInput label="Size" value={props.element.size} min={0} max={500} suffix="px" onChange={(value) => props.onChange(`${props.elementKey}.size`, value)} /> : null}
           {'size1' in props.element ? <DesignNumberInput label="Size 1" value={props.element.size1} onChange={(value) => props.onChange(`${props.elementKey}.size1`, value)} /> : null}
           {'size2' in props.element ? <DesignNumberInput label="Size 2" value={props.element.size2} onChange={(value) => props.onChange(`${props.elementKey}.size2`, value)} /> : null}
-          {'columns' in props.element ? <DesignNumberInput label="Columns" value={props.element.columns} onChange={(value) => props.onChange(`${props.elementKey}.columns`, value)} /> : null}
+          {'columns' in props.element && type !== 'gallery' ? <DesignNumberInput label="Columns" value={props.element.columns} onChange={(value) => props.onChange(`${props.elementKey}.columns`, value)} /> : null}
           {type === 'gallery' ? (
             <div>
-              <Label className="text-xs text-muted-foreground">Bento Template</Label>
+              <Label className="text-xs text-muted-foreground">Variasi Gallery</Label>
               <select
                 className="mt-2 h-10 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                value={String(props.element.variant ?? 'bento-feature-left')}
+                value={getGalleryLayoutVariant(String(props.element.variant ?? '')).id}
                 onChange={(event) => props.onChange(`${props.elementKey}.variant`, event.target.value)}
               >
-                <option value="bento-feature-left">Feature Left</option>
-                <option value="bento-feature-right">Feature Right</option>
-                <option value="bento-banner">Banner</option>
-                <option value="bento-center">Center</option>
-                <option value="bento-mosaic">Mosaic</option>
+                {GALLERY_LAYOUT_VARIANTS.map((variant) => (
+                  <option key={variant.id} value={variant.id}>
+                    {variant.label} ({variant.slotCount} slot)
+                  </option>
+                ))}
               </select>
             </div>
           ) : null}
@@ -420,6 +480,14 @@ function ElementDesignInspector(props: {
         {'color1' in props.element ? <DesignTextInput label="Color 1" value={props.element.color1} onChange={(value) => props.onChange(`${props.elementKey}.color1`, value)} /> : null}
         {'color2' in props.element ? <DesignTextInput label="Color 2" value={props.element.color2} onChange={(value) => props.onChange(`${props.elementKey}.color2`, value)} /> : null}
       </div>
+
+      {type === 'gallery' ? (
+        <GalleryFrameInspector
+          elementKey={props.elementKey}
+          element={props.element}
+          onChange={props.onChange}
+        />
+      ) : null}
 
       {box ? (
         <div className="space-y-3">

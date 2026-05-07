@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import useEmblaCarousel from 'embla-carousel-react'
 import ReactPlayer from 'react-player'
 import Lightbox from 'yet-another-react-lightbox'
-import { ArrowLeft, GripVertical, ImagePlus, Loader2, Pencil, Plus, Trash2, UploadCloud } from 'lucide-react'
+import { ArrowLeft, CalendarDays, ChevronDown, Download, GripVertical, ImagePlus, Loader2, Mail, Menu, Pencil, Plus, Trash2, UploadCloud, Volume2, X } from 'lucide-react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ErrorNotice } from '@/components/feedback/ErrorNotice'
 import { Badge } from '@/components/ui/badge'
@@ -16,8 +16,8 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { resolveApiAssetUrl, resolveGoogleMapsShareUrl } from '@/lib/api'
-import { getThemePreset, resolveThemeGroup } from '@/lib/sapatamu'
-import { PUBLIC_ADDITIONAL_SOURCE_THEME_IDS } from '@/lib/sapatamu-source-themes'
+import { getThemePreset, getThemeReleaseLabel, isThemeComingSoon, resolveThemeGroup } from '@/lib/sapatamu'
+import { PUBLIC_ADDITIONAL_SOURCE_THEME_IDS, PUBLIC_SOURCE_THEME_BACKDROPS } from '@/lib/sapatamu-source-themes'
 import { cn } from '@/lib/utils'
 import {
   findEditorPageBySlug,
@@ -56,9 +56,11 @@ import {
   isGoogleMapsShortUrl,
   listPageEditableKeys,
   mergePageDataWithDesignDefaults,
+  resolveEditorTokens,
   splitEditorParagraphs,
   stripEditorHtml,
 } from './editor/editor-utils'
+import { GALLERY_LAYOUT_VARIANTS, getGalleryFrameLayout, getGalleryLayoutVariant, getGallerySlotFrame, getGalleryVariantFrameSettings } from './editor/gallery-layouts'
 import 'yet-another-react-lightbox/styles.css'
 import './editor/sapatamu-editor.css'
 
@@ -67,7 +69,7 @@ type MediaPickerTarget =
   | { kind: 'global-hero-photo'; heroKey: BackgroundHeroElementKey; mediaType: 'image' }
   | { kind: 'page-background'; pageUniqueId: number; mediaType: 'image' | 'video' }
   | { kind: 'element-image'; pageUniqueId: number; elementKey: string; mediaType: 'image' }
-  | { kind: 'element-gallery'; pageUniqueId: number; elementKey: string; mediaType: 'image' }
+  | { kind: 'element-gallery'; pageUniqueId: number; elementKey: string; mediaType: 'image'; slotIndex?: number }
   | { kind: 'element-video'; pageUniqueId: number; elementKey: string; mediaType: 'video' }
 
 type EditorPanelMode = 'layouts' | 'theme' | 'palette' | 'background'
@@ -102,15 +104,15 @@ function isSourceThemePreview(themeId: string | undefined, layoutCode: string) {
 type BackgroundHeroSettings = {
   left?: {
     photo?: { enabled?: boolean; url?: string; x?: number; y?: number; size?: number }
-    subTitle?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
-    title?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
-    description?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
+    subTitle?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number; lineHeight?: number }
+    title?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number; lineHeight?: number }
+    description?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number; lineHeight?: number }
   }
   right?: {
     photo?: { enabled?: boolean; url?: string; x?: number; y?: number; size?: number }
-    title?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
-    description?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
-    music?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number }
+    title?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number; lineHeight?: number }
+    description?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number; lineHeight?: number }
+    music?: { enabled?: boolean; text?: string; x?: number; y?: number; size?: number; lineHeight?: number }
   }
 }
 
@@ -134,14 +136,6 @@ const BACKGROUND_HERO_LABELS: Record<BackgroundHeroElementKey, string> = {
   'right.description': 'Right Description',
   'right.music': 'Right Music',
 }
-
-const GALLERY_VARIANTS = [
-  { value: 'bento-feature-left', label: 'Feature Left' },
-  { value: 'bento-feature-right', label: 'Feature Right' },
-  { value: 'bento-banner', label: 'Banner' },
-  { value: 'bento-center', label: 'Center' },
-  { value: 'bento-mosaic', label: 'Mosaic' },
-] as const
 
 const INPUT_CLASS =
   'h-10 rounded-xl border-border/70 bg-white/80 shadow-none focus-visible:border-accent focus-visible:ring-accent/20'
@@ -243,7 +237,19 @@ function getNextTextLineHeight(currentSize: number, currentLineHeight: number, n
   const ratio = currentSize > 0 && currentLineHeight > 0 ? currentLineHeight / currentSize : 1.2
   const normalizedRatio = ratio < 0.75 || ratio > 2.5 ? 1.2 : ratio
 
-  return Math.max(1, Math.round(nextSize * normalizedRatio * 10) / 10)
+  return Math.max(1, Math.round(nextSize * normalizedRatio))
+}
+
+function getHeroLineHeightValue(value?: number) {
+  if (!Number.isFinite(value)) return 12
+  const numericValue = Number(value)
+  return numericValue > 5 ? Math.round(numericValue) : Math.round(numericValue * 10)
+}
+
+function getHeroLineHeightCssValue(value?: number) {
+  if (!Number.isFinite(value)) return 1.2
+  const numericValue = Number(value)
+  return Math.max(0.5, numericValue > 5 ? numericValue / 10 : numericValue)
 }
 
 function getCountdownParts(value: string, now: number) {
@@ -271,14 +277,31 @@ function getHeroText(value: string | undefined, fallback: string) {
   return value && value.trim() ? value : fallback
 }
 
-function getHeroItemStyle(node?: { x?: number; y?: number; size?: number }): CSSProperties {
+function getPageMapUrl(page: SapatamuEditorPage) {
+  const mapElement = Object.values(page.data).find((item) => (
+    Boolean(item)
+    && typeof item === 'object'
+    && !Array.isArray(item)
+    && (item as { type?: string }).type === 'map'
+  )) as { url?: string } | undefined
+  return typeof mapElement?.url === 'string' ? mapElement.url.trim() : ''
+}
+
+function isMapDirectionButton(element: SapatamuEditorButtonElement) {
+  const content = stripEditorHtml(element.content)
+  return /petunjuk.*lokasi|buka\s+google\s+maps|google\s+maps/i.test(content)
+}
+
+function getHeroItemStyle(node?: { x?: number; y?: number; size?: number; lineHeight?: number }): CSSProperties {
   const size = Number.isFinite(node?.size) ? Math.max(20, Math.min(240, Number(node?.size))) : 100
   const x = Number.isFinite(node?.x) ? Number(node?.x) : 0
   const y = Number.isFinite(node?.y) ? Number(node?.y) : 0
+  const lineHeight = getHeroLineHeightCssValue(node?.lineHeight)
   return {
     '--hero-x': `${x}px`,
     '--hero-y': `${y}px`,
     '--hero-scale': size / 100,
+    '--hero-line-height': lineHeight,
   } as CSSProperties
 }
 
@@ -676,8 +699,13 @@ function EditorButtonPreview(props: {
   rsvpInitialName?: string
   onRsvpSubmitted?: (message: EditorGuestMessage) => void
   giftAccounts?: EditorGiftAccount[]
+  giftAddress?: string
+  onVintagePopup?: (popupId: string) => void
 }) {
-  const { page, elementKey, element, selectedElement, invitationId, fontFamily, isEditing, onOpen, rsvpInitialName, onRsvpSubmitted, giftAccounts = [] } = props
+  const { page, elementKey, element, selectedElement, invitationId, fontFamily, isEditing, onOpen, rsvpInitialName, onRsvpSubmitted, giftAccounts = [], giftAddress = '', onVintagePopup } = props
+  const mapUrl = getPageMapUrl(page)
+  const effectiveLink = isMapDirectionButton(element) && mapUrl ? mapUrl : element.link
+  const displayContent = isMapDirectionButton(element) ? 'Petunjuk ke Lokasi' : stripEditorHtml(element.content)
   const buttonFrameStyle = {
     '--el-x': `${element.padding.x ?? 0}px`,
     '--el-y': `${element.padding.y ?? 0}px`,
@@ -700,6 +728,7 @@ function EditorButtonPreview(props: {
     /kirim\s*(ucapan\s*)?\+?\s*rsvp/i.test(element.content) ||
     /konfirmasi.*rsvp/i.test(element.content)
   )
+  const isVintagePopupButton = !isEditing && Boolean(onVintagePopup) && element.link?.startsWith('popup:')
   const isOpenButton = !isEditing && Boolean(onOpen) && (
     element.link === '#open' ||
     /buka\s+undangan/i.test(stripEditorHtml(element.content)) ||
@@ -729,7 +758,6 @@ function EditorButtonPreview(props: {
       await dataCreate('invitation-rsvps', {
         invitation_id: invitationId,
         guest_name: rsvpForm.name.trim(),
-        phone_number: rsvpForm.phone || null,
         status: rsvpForm.status,
         attendees_count: Number(rsvpForm.guests),
         message: rsvpForm.message.trim() || null,
@@ -771,7 +799,7 @@ function EditorButtonPreview(props: {
         ...getAnimationInlineStyle(element.animation?.duration),
       }}
     >
-      {stripEditorHtml(element.content)}
+      {displayContent}
     </div>
   )
 
@@ -802,6 +830,17 @@ function EditorButtonPreview(props: {
             >
               {buttonNode}
             </button>
+          ) : isVintagePopupButton && onVintagePopup ? (
+            <button
+              type="button"
+              className="contents"
+              onClick={(e) => {
+                e.stopPropagation()
+                onVintagePopup(element.link.replace(/^popup:/, ''))
+              }}
+            >
+              {buttonNode}
+            </button>
           ) : isOpenButton && onOpen ? (
             <button
               type="button"
@@ -810,8 +849,8 @@ function EditorButtonPreview(props: {
             >
               {buttonNode}
             </button>
-          ) : !isEditing && element.link ? (
-            <a href={element.link} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+          ) : !isEditing && effectiveLink ? (
+            <a href={effectiveLink} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
               {buttonNode}
             </a>
           ) : buttonNode}
@@ -842,9 +881,8 @@ function EditorButtonPreview(props: {
               <div className="rounded-2xl border border-slate-200 p-4">
                 <p className="text-sm font-medium text-slate-900">Alamat Pengiriman Kado</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Jl. Contoh Alamat No. 123, RT 01 / RW 02, Kelurahan, Kecamatan, Kota 12345
+                  {giftAddress.trim() || 'Alamat pengiriman kado belum diatur di Manage Invitation.'}
                 </p>
-                <p className="mt-2 text-xs text-slate-400">a.n. Mempelai</p>
               </div>
             )}
           </div>
@@ -972,6 +1010,41 @@ function EditorImagePreview(props: {
   )
 }
 
+function clampGalleryNumber(value: unknown, min: number, max: number, fallback: number) {
+  const next = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(next)) return fallback
+  return Math.min(max, Math.max(min, next))
+}
+
+function getGalleryGridStyle(element: SapatamuEditorGalleryElement): CSSProperties {
+  const frameLayout = getGalleryFrameLayout(element.variant, getGalleryVariantFrameSettings(element.variant, element.frameSettingsByVariant, element.frameSettings))
+  return {
+    gridTemplateColumns: `repeat(${frameLayout.columns}, minmax(0, 1fr))`,
+    gridAutoRows: `${frameLayout.rowHeight}px`,
+    gap: `${frameLayout.gap}px`,
+  }
+}
+
+function getGalleryTileStyle(element: SapatamuEditorGalleryElement, index: number): CSSProperties {
+  const frame = getGallerySlotFrame(element.variant, index, getGalleryVariantFrameSettings(element.variant, element.frameSettingsByVariant, element.frameSettings))
+  return {
+    gridColumn: `${frame.colStart} / span ${frame.colSpan}`,
+    gridRow: `${frame.rowStart} / span ${frame.rowSpan}`,
+  }
+}
+
+function getGalleryImageStyle(element: SapatamuEditorGalleryElement, index: number): CSSProperties {
+  const adjustment = element.imageAdjustments?.[index] ?? {}
+  const x = clampGalleryNumber(adjustment.x, -50, 50, 0)
+  const y = clampGalleryNumber(adjustment.y, -50, 50, 0)
+  const zoom = clampGalleryNumber(adjustment.zoom, 1, 2, 1)
+
+  return {
+    objectPosition: `${50 + x}% ${50 + y}%`,
+    transform: `scale(${zoom})`,
+  }
+}
+
 function EditorGalleryPreview(props: {
   page: SapatamuEditorPage
   elementKey: string
@@ -979,12 +1052,15 @@ function EditorGalleryPreview(props: {
   selectedElement: string | null
   invitationId: string
   fallbackImages: string[]
-  onOpenLightbox: (index: number) => void
+  onOpenLightbox: (index: number, items?: string[]) => void
   isEditing: boolean
 }) {
-  const { page, elementKey, element, selectedElement, invitationId, fallbackImages, onOpenLightbox, isEditing } = props
-  const items = (element.items.length ? element.items : fallbackImages).slice(0, 9)
-  const variant = element.variant ?? 'bento-feature-left'
+  const { page, elementKey, element, selectedElement, invitationId, onOpenLightbox, isEditing } = props
+  const layoutVariant = getGalleryLayoutVariant(element.variant)
+  const filledItems = element.items.filter(Boolean).slice(0, layoutVariant.slotCount)
+  const slots = isEditing
+    ? Array.from({ length: layoutVariant.slotCount }, (_, index) => filledItems[index] ?? '')
+    : filledItems
 
   return (
     <EditorElementFrame
@@ -997,24 +1073,35 @@ function EditorGalleryPreview(props: {
       <div className="space-y-4 py-4">
         <p className="text-center text-lg font-semibold">{element.title}</p>
         <div
-          className={`sapatamu-gallery-bento sapatamu-gallery-bento-${variant}`}
+          className={`sapatamu-gallery-layout sapatamu-gallery-${layoutVariant.className}`}
+          style={getGalleryGridStyle(element)}
         >
-          {items.map((item, index) => (
+          {slots.map((item, index) => item ? (
             <button
               key={`${elementKey}-${index}`}
               type="button"
-              className="overflow-hidden rounded-2xl bg-white/12"
+              className="sapatamu-gallery-tile overflow-hidden bg-white/12"
+              style={getGalleryTileStyle(element, index)}
               onClick={(event) => {
                 event.stopPropagation()
-                onOpenLightbox(index)
+                onOpenLightbox(index, filledItems)
               }}
             >
               <img
                 src={resolveApiAssetUrl(item)}
                 alt={`Gallery ${index + 1}`}
-                className="size-full object-cover"
+                className="size-full object-cover transition-transform"
+                style={getGalleryImageStyle(element, index)}
               />
             </button>
+          ) : (
+            <div
+              key={`${elementKey}-empty-${index}`}
+              className="sapatamu-gallery-tile sapatamu-gallery-placeholder"
+              style={getGalleryTileStyle(element, index)}
+            >
+              <ImagePlus className="size-6" />
+            </div>
           ))}
         </div>
       </div>
@@ -1071,14 +1158,14 @@ function EditorSimpleCardPreview(props: {
     | SapatamuEditorRsvpElement
     | SapatamuEditorGiftElement
     | SapatamuEditorStoryElement
-    | { type: 'sponsor' | 'credit'; title: string; description: string; animation: { style: number; duration?: number }; items?: ContactItem[] }
+    | { type: 'sponsor' | 'credit'; title: string; description: string; padding?: SapatamuEditorPadding; animation: { style: number; duration?: number }; items?: ContactItem[] }
   selectedElement: string | null
   invitationId: string
   isEditing: boolean
   rsvpMessages?: EditorGuestMessage[]
   palette?: SapatamuEditorDocumentV3['editor']['colorPalette']
 }) {
-  const { page, elementKey, element, selectedElement, invitationId, isEditing, rsvpMessages = [], palette } = props
+  const { page, elementKey, element, selectedElement, invitationId, isEditing, rsvpMessages = [] } = props
   const isRsvp = element.type === 'rsvp'
   const isStory = element.type === 'story'
   const isGift = element.type === 'gift'
@@ -1095,6 +1182,13 @@ function EditorSimpleCardPreview(props: {
   }
 
   if (isGift) return null
+  const elementPadding = element.padding ?? { top: 0, bottom: 0, left: 0, right: 0, x: 0, y: 0 }
+  const cardFrameStyle = {
+    '--el-x': `${elementPadding.x ?? 0}px`,
+    '--el-y': `${elementPadding.y ?? 0}px`,
+    position: 'relative' as const,
+    zIndex: 1,
+  }
 
   return (
     <EditorElementFrame
@@ -1103,12 +1197,19 @@ function EditorSimpleCardPreview(props: {
       selectedElement={selectedElement}
       invitationId={invitationId}
       isEditing={isEditing}
+      frameStyle={cardFrameStyle}
     >
       <div
-        className={`${isStory || isCredit ? 'space-y-3 px-5 py-5' : 'space-y-3 rounded-3xl px-5 py-5 editor-preview-glass'} ${getEditorAnimationClass(
+        className={`${isStory || isCredit ? 'space-y-3 px-5 py-5' : isRsvp ? 'sapatamu-rsvp-shell space-y-3 rounded-3xl px-5 py-5' : 'space-y-3 rounded-3xl px-5 py-5 editor-preview-glass'} ${getEditorAnimationClass(
           element.animation?.style,
         )}`}
-        style={getAnimationInlineStyle(getAnimationDuration(element.animation))}
+        style={{
+          paddingTop: elementPadding.top,
+          paddingBottom: elementPadding.bottom,
+          paddingLeft: elementPadding.left ?? undefined,
+          paddingRight: elementPadding.right ?? undefined,
+          ...getAnimationInlineStyle(getAnimationDuration(element.animation)),
+        }}
       >
         {isCredit ? (
           <div className="space-y-2 text-center">
@@ -1116,7 +1217,7 @@ function EditorSimpleCardPreview(props: {
             <img src="/brand-logo.png" alt="Rekavia" className="mx-auto h-7 w-auto object-contain" />
           </div>
         ) : (
-          <p className="text-lg font-semibold">{element.title}</p>
+          <p className={`text-lg font-semibold ${isRsvp ? 'text-slate-950' : ''}`}>{element.title}</p>
         )}
         {element.type === 'sponsor' && Array.isArray(element.items) ? (
           <div className="space-y-4 text-center">
@@ -1162,21 +1263,19 @@ function EditorSimpleCardPreview(props: {
             </button>
           </div>
         ) : isRsvp ? (
-          <div className="mt-2 space-y-2 text-left">
-            {(rsvpMessages.length ? rsvpMessages.slice(0, 5) : [
+          <div className="sapatamu-rsvp-message-list mt-2 space-y-2 overflow-y-auto pr-1 text-left">
+            {(rsvpMessages.length ? rsvpMessages : [
               { id: 'empty-rsvp-message', guestName: 'Belum ada ucapan', message: 'Ucapan tamu akan tampil di sini setelah mereka mengisi form.', createdAt: '' },
             ]).map((message) => (
               <div
                 key={message.id}
-                className="rounded-2xl border px-4 py-3"
+                className="rounded-2xl border border-slate-200/80 bg-white/90 px-4 py-3 text-slate-950 shadow-sm"
                 style={{
-                  borderColor: palette?.accentSoft ?? 'rgba(255,255,255,0.16)',
-                  backgroundColor: palette?.surface ?? 'rgba(255,255,255,0.1)',
-                  color: palette?.text ?? 'inherit',
+                  backdropFilter: 'blur(6px)',
                 }}
               >
-                <p className="text-sm font-semibold">{message.guestName}</p>
-                <p className="mt-1 text-xs leading-5 opacity-80">{message.message}</p>
+                <p className="text-sm font-semibold text-slate-950">{message.guestName}</p>
+                <p className="mt-1 text-sm leading-5 text-slate-700">{message.message}</p>
               </div>
             ))}
           </div>
@@ -1349,17 +1448,6 @@ function EditorMapPreview(props: {
             )
           ) : null}
         </div>
-        {mode === 'google-map' && element.url ? (
-          <a
-            href={element.url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3 inline-flex rounded-full border border-white/25 bg-black/15 px-4 py-2 text-xs font-semibold text-white/90 transition hover:bg-black/25"
-            onClick={(event) => event.stopPropagation()}
-          >
-            Buka Google Maps
-          </a>
-        ) : null}
       </div>
     </EditorElementFrame>
   )
@@ -1609,25 +1697,60 @@ export function PreviewPage(props: {
   invitationLink: string
   fonts: SapatamuEditorHydrationResponse['catalog']['fonts']
   fallbackImages: string[]
-  onOpenLightbox: (index: number) => void
+  onOpenLightbox: (index: number, items?: string[]) => void
   isEditing: boolean
   onOpen?: () => void
   rsvpInitialName?: string
   rsvpMessages?: EditorGuestMessage[]
   onRsvpSubmitted?: (message: EditorGuestMessage) => void
   giftAccounts?: EditorGiftAccount[]
+  giftAddress?: string
   resolveTokens?: boolean
+  isInvitationOpen?: boolean
+  isMusicPlaying?: boolean
+  onMusicToggle?: () => void
+  onVintageNavigate?: (target: string) => void
 }) {
-  const { page, invitationId, selectedElement, documentValue, invitationLink, fonts, fallbackImages, onOpenLightbox, isEditing, onOpen, rsvpInitialName, rsvpMessages = [], onRsvpSubmitted, giftAccounts = [], resolveTokens = true } = props
+  const {
+    page,
+    invitationId,
+    selectedElement,
+    documentValue,
+    invitationLink,
+    fonts,
+    fallbackImages,
+    onOpenLightbox,
+    isEditing,
+    onOpen,
+    rsvpInitialName,
+    rsvpMessages = [],
+    onRsvpSubmitted,
+    giftAccounts = [],
+    giftAddress = '',
+    resolveTokens = true,
+    isInvitationOpen = true,
+    isMusicPlaying = false,
+    onMusicToggle,
+    onVintageNavigate,
+  } = props
   const themeId = documentValue?.editor.colorPalette.themeId
   const isSourceTheme = isSourceThemePreview(themeId, page.layoutCode)
+  const isAishwaryaVintageTheme = themeId === 'aishwarya-peonny'
   const sourceThemeClass = isSourceTheme && themeId ? ` sapatamu-theme-${themeId.replace(/[^a-z0-9-]/gi, '-').toLowerCase()}` : ''
+  const layoutClass = page.layoutCode ? ` sapatamu-layout-${page.layoutCode.replace(/[^a-z0-9-]/gi, '-').toLowerCase()}` : ''
+  const [vintageMenuOpen, setVintageMenuOpen] = useState(false)
+  const [vintagePopup, setVintagePopup] = useState<string | null>(null)
 
   const globalBackground = documentValue?.editor.globalBackground ?? null
-  const pageBackground = getPageBackground(page, null)
+  const defaultPageData = documentValue?.editor.layoutCatalogSnapshot
+    ?.find((layout) => layout.layoutCode === page.layoutCode)
+    ?.defaultPageData as SapatamuEditorPage['data'] | undefined
+  const defaultPageBackground = typeof defaultPageData?.background === 'string' ? defaultPageData.background : null
+  const pageBackground = getPageBackground(page, defaultPageBackground)
   const background = isSourceTheme ? pageBackground || globalBackground : globalBackground || pageBackground
+  const defaultBackgroundDetails = defaultPageData?.backgroundDetails as SapatamuEditorPage['data']['backgroundDetails'] | undefined
   const backgroundDetails = isSourceTheme || pageBackground
-    ? page.data.backgroundDetails
+    ? page.data.backgroundDetails ?? defaultBackgroundDetails
     : documentValue?.editor.globalBackgroundDetails ?? page.data.backgroundDetails
   const backgroundType = backgroundDetails.type === 'video' ? 'video' : background ? 'image' : backgroundDetails.type
   const backgroundStyle =
@@ -1638,7 +1761,7 @@ export function PreviewPage(props: {
       : backgroundType === 'image' && background
         ? {
             backgroundImage: `url(${resolveApiAssetUrl(background)})`,
-            backgroundSize: isSourceTheme ? 'contain' : 'cover',
+            backgroundSize: 'cover',
             backgroundRepeat: 'no-repeat',
             backgroundPosition: 'center',
           }
@@ -1654,14 +1777,18 @@ export function PreviewPage(props: {
   }
 
   const pageKeys = listPageEditableKeys(page)
+  const hasStoryElement = pageKeys.some((key) => {
+    const item = getEditableElement(page, key)
+    return Boolean(item && !item.disabled && item.type === 'story')
+  })
 
   return (
     <div
-      className={`sapatamu-editor-page sapatamu-editor-surface-grid relative overflow-hidden rounded-[32px] px-6 py-10 text-center${isSourceTheme ? ` sapatamu-signature-page sapatamu-source-theme-page${sourceThemeClass}` : ''}`}
+      className={`sapatamu-editor-page sapatamu-editor-surface-grid relative overflow-hidden rounded-[32px] px-6 py-10 text-center${layoutClass}${isSourceTheme ? ` sapatamu-signature-page sapatamu-source-theme-page${sourceThemeClass}` : ''}`}
       style={backgroundStyle}
     >
       {backgroundType === 'video' && background ? (
-        <div className="absolute inset-0 [&_video]:!object-cover [&_video]:!h-full [&_video]:!w-full">
+        <div className="absolute inset-0 [&_video]:!h-full [&_video]:!w-full [&_video]:!object-cover">
           <ReactPlayer
             src={resolveApiAssetUrl(background)}
             width="100%"
@@ -1676,12 +1803,52 @@ export function PreviewPage(props: {
       ) : null}
       <div className="absolute inset-0" style={overlayStyle} />
       {isSourceTheme ? <SignatureSourceCornerOrnaments corners={page.data.cornerElements?.list ?? []} /> : null}
+      {isAishwaryaVintageTheme ? <VintageAssetLayers layers={page.data.vintageLayers} /> : null}
+      {isAishwaryaVintageTheme && isInvitationOpen ? (
+        <VintageFloatingMenu
+          open={vintageMenuOpen}
+          onOpenChange={setVintageMenuOpen}
+          onPopupOpen={setVintagePopup}
+          menu={page.data.vintageMenu}
+          onNavigate={onVintageNavigate}
+        />
+      ) : null}
       <div className={`relative z-10 mx-auto flex max-w-[520px] flex-col gap-3${isSourceTheme ? ' sapatamu-signature-content sapatamu-source-theme-content' : ''}`}>
-        {pageKeys.map((key) => {
+        {isAishwaryaVintageTheme ? (
+          <AishwaryaVintageContent
+            page={page}
+            invitationId={invitationId}
+            selectedElement={selectedElement}
+            documentValue={documentValue}
+            invitationLink={invitationLink}
+            fonts={fonts}
+            fallbackImages={fallbackImages}
+            onOpenLightbox={onOpenLightbox}
+            isEditing={isEditing}
+            onOpen={onOpen}
+            rsvpInitialName={rsvpInitialName}
+            rsvpMessages={rsvpMessages}
+            onRsvpSubmitted={onRsvpSubmitted}
+            giftAccounts={giftAccounts}
+            giftAddress={giftAddress}
+            resolveTokens={resolveTokens}
+            onVintagePopup={setVintagePopup}
+            isInvitationOpen={isInvitationOpen}
+            isMusicPlaying={isMusicPlaying}
+            onMusicToggle={onMusicToggle}
+            onVintageNavigate={onVintageNavigate}
+          />
+        ) : pageKeys.map((key) => {
           const candidate = getEditableElement(page, key)
           if (!candidate || candidate.disabled) return null
           // On 'doa' pages, skip RSVP elements — prayer section should not include attendance form
           if (candidate.type === 'rsvp' && page.family === 'doa') return null
+
+          if (
+            hasStoryElement
+            && (candidate.type === 'button' || candidate.type === 'url')
+            && /perjalanan\s+cinta|love\s*story/i.test(stripEditorHtml((candidate as SapatamuEditorButtonElement).content))
+          ) return null
 
           switch (candidate.type) {
             case 'text':
@@ -1716,6 +1883,8 @@ export function PreviewPage(props: {
                   rsvpInitialName={rsvpInitialName}
                   onRsvpSubmitted={onRsvpSubmitted}
                   giftAccounts={giftAccounts}
+                  giftAddress={giftAddress}
+                  onVintagePopup={setVintagePopup}
                 />
               )
             case 'image':
@@ -1867,7 +2036,728 @@ export function PreviewPage(props: {
           }
         })}
       </div>
+      {isAishwaryaVintageTheme ? (
+        <VintagePopupDialog
+          popupId={vintagePopup}
+          popups={page.data.vintagePopups}
+          onOpenChange={(open) => {
+            if (!open) setVintagePopup(null)
+          }}
+        />
+      ) : null}
     </div>
+  )
+}
+
+type VintageAssetLayer = {
+  id?: string
+  src?: string
+  className?: string
+  animation?: string
+  style?: CSSProperties
+}
+
+type VintagePopupData = {
+  title?: string
+  image?: string
+  description?: string
+  downloadLabel?: string
+}
+
+function vintageRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function vintageString(value: unknown) {
+  return typeof value === 'string' ? value : ''
+}
+
+function VintageAssetLayers(props: { layers: unknown }) {
+  const layers = Array.isArray(props.layers) ? props.layers as VintageAssetLayer[] : []
+  if (!layers.length) return null
+
+  return (
+    <div className="aishwarya-vintage-layers" aria-hidden="true">
+      {layers.map((layer, index) => {
+        const src = vintageString(layer.src)
+        if (!src) return null
+        return (
+          <img
+            key={layer.id ?? `${src}-${index}`}
+            src={resolveApiAssetUrl(src)}
+            alt=""
+            className={cn('aishwarya-vintage-layer', layer.className, layer.animation ? `aishwarya-vintage-${layer.animation}` : '')}
+            style={layer.style}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function VintageFloatingMenu(props: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onPopupOpen: (popupId: string) => void
+  menu?: unknown
+  onNavigate?: (target: string) => void
+}) {
+  const menu = vintageRecord(props.menu)
+  const items = Array.isArray(menu.items)
+    ? menu.items.map((item) => vintageRecord(item)).filter((item) => vintageString(item.label) && vintageString(item.target))
+    : [
+        { label: 'Gallery', target: '#gallery' },
+        { label: 'RSVP', target: '#rsvp' },
+        { label: 'Wedding Gift', target: '#gift' },
+        { label: 'Souvenir Card', target: 'popup:souvenir-card' },
+      ]
+
+  const handleClick = (target: string) => {
+    if (target.startsWith('popup:')) {
+      props.onPopupOpen(target.replace(/^popup:/, ''))
+    } else if (props.onNavigate) {
+      props.onNavigate(target)
+    } else if (typeof window !== 'undefined') {
+      window.location.hash = target
+    }
+    props.onOpenChange(false)
+  }
+
+  return (
+    <div className="aishwarya-vintage-menu">
+      <button
+        type="button"
+        className="aishwarya-vintage-menu-trigger"
+        onClick={(event) => {
+          event.stopPropagation()
+          props.onOpenChange(!props.open)
+        }}
+        aria-label={props.open ? 'Tutup menu' : 'Buka menu'}
+      >
+        {props.open ? <X className="size-4" /> : <Menu className="size-4" />}
+      </button>
+      {props.open ? (
+        <div className="aishwarya-vintage-menu-panel">
+          {items.map((item) => (
+            <button key={vintageString(item.label)} type="button" onClick={() => handleClick(vintageString(item.target))}>
+              {vintageString(item.label)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function VintageThemeExtras(props: { page: SapatamuEditorPage }) {
+  const dressCode = vintageRecord(props.page.data.vintageDressCode)
+  const swatches = Array.isArray(dressCode.swatches) ? dressCode.swatches.filter((item): item is string => typeof item === 'string') : []
+  const registry = vintageRecord(props.page.data.vintageGiftRegistry)
+  const recommendations = Array.isArray(registry.recommendations)
+    ? registry.recommendations.map((item) => vintageRecord(item)).filter((item) => item.image || item.title)
+    : []
+
+  return (
+    <>
+      {swatches.length ? (
+        <div className="aishwarya-vintage-dress">
+          <div className="aishwarya-vintage-swatches">
+            {swatches.map((color) => <span key={color} style={{ backgroundColor: color }} />)}
+          </div>
+          <p>{vintageString(dressCode.description)}</p>
+        </div>
+      ) : null}
+      {recommendations.length ? (
+        <div className="aishwarya-vintage-registry">
+          {recommendations.map((item, index) => (
+            <div key={`${vintageString(item.title)}-${index}`} className="aishwarya-vintage-registry-item">
+              {vintageString(item.image) ? <img src={resolveApiAssetUrl(vintageString(item.image))} alt="" /> : null}
+              <span>{vintageString(item.title)}</span>
+            </div>
+          ))}
+          <p>Konfirmasi hadiah dapat dilakukan melalui WhatsApp setelah transfer atau pengiriman kado.</p>
+        </div>
+      ) : null}
+    </>
+  )
+}
+
+function VintagePopupDialog(props: {
+  popupId: string | null
+  popups: unknown
+  onOpenChange: (open: boolean) => void
+}) {
+  const source = vintageRecord(props.popups)
+  const normalizedId = props.popupId?.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase()) ?? ''
+  const popup = vintageRecord(source[normalizedId] ?? source[props.popupId ?? '']) as VintagePopupData
+  const imageUrl = vintageString(popup.image)
+
+  const downloadImage = () => {
+    if (!imageUrl || typeof document === 'undefined') return
+    const anchor = document.createElement('a')
+    anchor.href = resolveApiAssetUrl(imageUrl)
+    anchor.download = `${props.popupId ?? 'aishwarya-card'}.png`
+    anchor.click()
+  }
+
+  return (
+    <Dialog open={Boolean(props.popupId && (popup.title || popup.image))} onOpenChange={props.onOpenChange}>
+      <DialogContent className="aishwarya-vintage-popup">
+        <DialogHeader>
+          <DialogTitle>{vintageString(popup.title) || 'Aishwarya Card'}</DialogTitle>
+          {vintageString(popup.description) ? <DialogDescription>{vintageString(popup.description)}</DialogDescription> : null}
+        </DialogHeader>
+        {imageUrl ? (
+          <div className="aishwarya-vintage-popup-image">
+            <img src={resolveApiAssetUrl(imageUrl)} alt="" />
+          </div>
+        ) : null}
+        {imageUrl ? (
+          <button type="button" className="aishwarya-vintage-popup-download" onClick={downloadImage}>
+            <Download className="size-4" />
+            {vintageString(popup.downloadLabel) || 'Download'}
+          </button>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+const AISHWARYA_ORIGINAL_BASE = '/sapatamu-themes/aishwarya-peonny/original'
+const aishwaryaPicture = (name: string) => `${AISHWARYA_ORIGINAL_BASE}/pictures/${name}`
+
+function AishwaryaVintageContent(props: {
+  page: SapatamuEditorPage
+  invitationId: string
+  selectedElement: string | null
+  documentValue: ReturnType<typeof useSapatamuEditorStore.getState>['document']
+  invitationLink: string
+  fonts: SapatamuEditorHydrationResponse['catalog']['fonts']
+  fallbackImages: string[]
+  onOpenLightbox: (index: number, items?: string[]) => void
+  isEditing: boolean
+  onOpen?: () => void
+  rsvpInitialName?: string
+  rsvpMessages?: EditorGuestMessage[]
+  onRsvpSubmitted?: (message: EditorGuestMessage) => void
+  giftAccounts?: EditorGiftAccount[]
+  giftAddress?: string
+  resolveTokens?: boolean
+  onVintagePopup: (popupId: string) => void
+  isInvitationOpen?: boolean
+  isMusicPlaying?: boolean
+  onMusicToggle?: () => void
+  onVintageNavigate?: (target: string) => void
+}) {
+  const { page } = props
+
+  switch (page.layoutCode) {
+    case 'aishwarya-peonny-opening':
+      return <AishwaryaOpening {...props} />
+    case 'aishwarya-peonny-quote':
+      return <AishwaryaQuote {...props} />
+    case 'aishwarya-peonny-mempelai':
+      return <AishwaryaCouple {...props} />
+    case 'aishwarya-peonny-love-story':
+      return <AishwaryaLoveStory {...props} />
+    case 'aishwarya-peonny-save-date':
+      return <AishwaryaSaveDate {...props} />
+    case 'aishwarya-peonny-events':
+      return <AishwaryaEvents {...props} />
+    case 'aishwarya-peonny-live-streaming':
+      return <AishwaryaLiveStreaming {...props} />
+    case 'aishwarya-peonny-gallery':
+      return <AishwaryaGallery {...props} />
+    case 'aishwarya-peonny-rsvp':
+      return <AishwaryaRsvp {...props} />
+    case 'aishwarya-peonny-gift':
+      return <AishwaryaGift {...props} />
+    case 'aishwarya-peonny-thanks':
+      return <AishwaryaThanks {...props} />
+    case 'aishwarya-peonny-attire':
+    case 'aishwarya-peonny-wedding-frame':
+    default:
+      return <AishwaryaSimpleSection {...props} />
+  }
+}
+
+type AishwaryaProps = Parameters<typeof AishwaryaVintageContent>[0]
+
+function getAishwaryaText(props: AishwaryaProps, key: string) {
+  const element = getEditableElement(props.page, key) as SapatamuEditorTextElement | null
+  if (!element || element.disabled || element.type !== 'text') return ''
+  const content = props.resolveTokens === false
+    ? element.content
+    : resolveEditorTokens(element.content, props.documentValue, props.invitationLink)
+  return content
+}
+
+function getAishwaryaImage(props: AishwaryaProps, key: string, fallback: string) {
+  const element = getEditableElement(props.page, key) as SapatamuEditorImageElement | null
+  return element && !element.disabled && element.type === 'image' && element.content
+    ? element.content
+    : fallback
+}
+
+function AishwaryaText(props: AishwaryaProps & { elementKey: string; className?: string }) {
+  const element = getEditableElement(props.page, props.elementKey) as SapatamuEditorTextElement | null
+  const html = getAishwaryaText(props, props.elementKey)
+  if (!element || element.disabled || element.type !== 'text' || !html) return null
+
+  return (
+    <EditorElementFrame
+      page={props.page}
+      elementKey={props.elementKey}
+      selectedElement={props.selectedElement}
+      invitationId={props.invitationId}
+      isEditing={props.isEditing}
+    >
+      <div
+        className={cn('aishwarya-text', props.className, getEditorAnimationClass(element.animation?.style))}
+        style={{
+          color: element.color,
+          fontFamily: findFontName(props.fonts, element.font),
+          fontSize: element.size,
+          lineHeight: `${element.lineHeight}px`,
+          ...getAnimationInlineStyle(element.animation?.duration),
+        }}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </EditorElementFrame>
+  )
+}
+
+function AishwaryaButton(props: AishwaryaProps & { elementKey: string; className?: string; children?: ReactNode }) {
+  const element = getEditableElement(props.page, props.elementKey) as SapatamuEditorButtonElement | null
+  if (!element || element.disabled || (element.type !== 'button' && element.type !== 'url')) return null
+  const label = props.children ?? stripEditorHtml(resolveEditorTokens(element.content, props.documentValue, props.invitationLink))
+  const link = resolveEditorTokens(element.link, props.documentValue, props.invitationLink)
+  const handleClick = (event: MouseEvent) => {
+    event.stopPropagation()
+    if (props.isEditing) return
+    if (link === '#open') props.onOpen?.()
+    else if (link.startsWith('popup:')) props.onVintagePopup(link.replace(/^popup:/, ''))
+    else if (link.startsWith('gift:')) props.onVintagePopup(link.replace(/^gift:/, 'gift-'))
+    else if (link.startsWith('#') && props.onVintageNavigate) props.onVintageNavigate(link)
+    else if (link && typeof window !== 'undefined') window.open(link, '_blank', 'noreferrer')
+  }
+
+  return (
+    <EditorElementFrame
+      page={props.page}
+      elementKey={props.elementKey}
+      selectedElement={props.selectedElement}
+      invitationId={props.invitationId}
+      isEditing={props.isEditing}
+    >
+      <button
+        type="button"
+        className={cn('aishwarya-button', props.className, getEditorAnimationClass(element.animation?.style))}
+        onClick={handleClick}
+        style={getAnimationInlineStyle(element.animation?.duration)}
+      >
+        {label}
+      </button>
+    </EditorElementFrame>
+  )
+}
+
+function AishwaryaPhotoFrame(props: AishwaryaProps & { elementKey: string; fallback: string; className?: string }) {
+  const src = getAishwaryaImage(props, props.elementKey, props.fallback)
+  return (
+    <EditorElementFrame
+      page={props.page}
+      elementKey={props.elementKey}
+      selectedElement={props.selectedElement}
+      invitationId={props.invitationId}
+      isEditing={props.isEditing}
+    >
+      <div className={cn('aishwarya-photo-frame', props.className)}>
+        <img className="aishwarya-photo-frame-image" src={resolveApiAssetUrl(src)} alt="" />
+        <img className="aishwarya-photo-frame-gold" src={resolveApiAssetUrl(aishwaryaPicture('Heritage-Frame-scaled-1-1006x1536.webp'))} alt="" />
+        <img className="aishwarya-photo-frame-flower" src={resolveApiAssetUrl(aishwaryaPicture('Heritage-Bunga-5.webp'))} alt="" />
+      </div>
+    </EditorElementFrame>
+  )
+}
+
+function AishwaryaFloatingActions(props: {
+  onVintageNavigate?: (target: string) => void
+  onMusicToggle?: () => void
+  isMusicPlaying?: boolean
+}) {
+  return (
+    <div className="aishwarya-floating-actions">
+      <button type="button" aria-label="Buka RSVP" onClick={() => props.onVintageNavigate?.('#rsvp')}>
+        <Mail className="size-5" />
+      </button>
+      <button type="button" aria-label={props.isMusicPlaying ? 'Matikan musik' : 'Putar musik'} onClick={props.onMusicToggle}>
+        <Volume2 className="size-5" />
+      </button>
+    </div>
+  )
+}
+
+function AishwaryaOpening(props: AishwaryaProps) {
+  const gate = vintageRecord(props.page.data.vintageGate)
+  const secondLabel = vintageString(gate.secondOpenButtonLabel)
+  return (
+    <section className="aishwarya-section aishwarya-opening">
+      <div className="aishwarya-opening-story">{secondLabel || 'the story begins...'}</div>
+      <AishwaryaText {...props} elementKey="text1" className="aishwarya-opening-kicker" />
+      <AishwaryaText {...props} elementKey="text2" className="aishwarya-opening-names" />
+      <AishwaryaText {...props} elementKey="text3" className="aishwarya-opening-quote" />
+      <AishwaryaText {...props} elementKey="text4" className="aishwarya-opening-guest" />
+      <AishwaryaButton {...props} elementKey="button" />
+      <AishwaryaButton {...props} elementKey="button2" className="aishwarya-opening-qr" />
+      {props.isInvitationOpen ? (
+        <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+      ) : null}
+    </section>
+  )
+}
+
+function AishwaryaQuote(props: AishwaryaProps) {
+  return (
+    <section className="aishwarya-section aishwarya-quote">
+      <div className="aishwarya-quote-card">
+        <img className="aishwarya-wax-seal" src={resolveApiAssetUrl(aishwaryaPicture('Heritage-Stamp-2-1024x1024.webp'))} alt="" />
+        <AishwaryaText {...props} elementKey="text1" className="aishwarya-quote-body" />
+        <AishwaryaText {...props} elementKey="text2" className="aishwarya-quote-source" />
+      </div>
+      <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+    </section>
+  )
+}
+
+function AishwaryaCouple(props: AishwaryaProps) {
+  return (
+    <section className="aishwarya-section aishwarya-couple">
+      <AishwaryaText {...props} elementKey="text1" className="aishwarya-script-title" />
+      <AishwaryaText {...props} elementKey="text2" className="aishwarya-lead" />
+      <AishwaryaPhotoFrame {...props} elementKey="image1" fallback={aishwaryaPicture('Heritage-Sandhayu-IMG_6049.webp')} />
+      <div className="aishwarya-profile-card">
+        <AishwaryaText {...props} elementKey="text3" className="aishwarya-profile-name" />
+        <AishwaryaButton {...props} elementKey="url1" className="aishwarya-instagram-button" />
+      </div>
+      <p className="aishwarya-and">dan</p>
+      <AishwaryaPhotoFrame {...props} elementKey="image2" fallback={aishwaryaPicture('Bagas-Naila-LIBLOP-PICTURE-2630245.webp')} />
+      <div className="aishwarya-profile-card">
+        <AishwaryaText {...props} elementKey="text4" className="aishwarya-profile-name" />
+        <AishwaryaButton {...props} elementKey="url2" className="aishwarya-instagram-button" />
+      </div>
+      <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+    </section>
+  )
+}
+
+function AishwaryaLoveStory(props: AishwaryaProps) {
+  const story = vintageRecord(props.page.data.story)
+  const items = Array.isArray(story.items ?? story.content) ? (story.items ?? story.content) as Array<Record<string, unknown>> : []
+  return (
+    <section className="aishwarya-section aishwarya-love-story">
+      <div className="aishwarya-tilted-frame">
+        <img src={resolveApiAssetUrl(aishwaryaPicture('Heritage-Sandhayu-IMG_6438.webp'))} alt="" />
+      </div>
+      <AishwaryaText {...props} elementKey="text1" className="aishwarya-script-title" />
+      <div className="aishwarya-timeline">
+        {(items.length ? items : [
+          { title: 'Awal Bertemu', description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.' },
+          { title: 'Menjalin Hubungan', description: 'Facilisis sed odio morbi quis commodo odio.' },
+          { title: 'Bertunangan', description: 'Vestibulum morbi blandit cursus risus.' },
+        ]).slice(0, 3).map((item, index) => (
+          <div key={`${vintageString(item.title)}-${index}`} className="aishwarya-timeline-item">
+            <h3>{vintageString(item.title) || `Cerita ${index + 1}`}</h3>
+            <p>{vintageString(item.description)}</p>
+          </div>
+        ))}
+      </div>
+      <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+    </section>
+  )
+}
+
+function useAishwaryaCountdown(documentValue: AishwaryaProps['documentValue']) {
+  const target = documentValue?.events?.[0]
+  const date = `${target?.date ?? ''}T${target?.timeStart ?? '00:00'}:00`
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const diff = Math.max(0, new Date(date).getTime() - now)
+  return {
+    days: Math.floor(diff / 86400000),
+    hours: Math.floor((diff / 3600000) % 24),
+    minutes: Math.floor((diff / 60000) % 60),
+    seconds: Math.floor((diff / 1000) % 60),
+  }
+}
+
+function AishwaryaSaveDate(props: AishwaryaProps) {
+  const countdown = useAishwaryaCountdown(props.documentValue)
+  return (
+    <section className="aishwarya-section aishwarya-save-date">
+      <AishwaryaText {...props} elementKey="text1" className="aishwarya-script-title aishwarya-align-left" />
+      <AishwaryaText {...props} elementKey="text2" className="aishwarya-quote-line" />
+      <div className="aishwarya-countdown-grid">
+        {[
+          ['days', 'Hari'],
+          ['hours', 'Jam'],
+          ['minutes', 'Menit'],
+          ['seconds', 'Detik'],
+        ].map(([key, label]) => (
+          <div key={key} className="aishwarya-countdown-tile">
+            <strong>{countdown[key as keyof typeof countdown]}</strong>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+      <AishwaryaButton {...props} elementKey="button"><CalendarDays className="size-4" /> Simpan Kalender</AishwaryaButton>
+      <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+    </section>
+  )
+}
+
+function AishwaryaEvents(props: AishwaryaProps) {
+  return (
+    <section className="aishwarya-section aishwarya-events">
+      <div className="aishwarya-paper-panel">
+        <AishwaryaText {...props} elementKey="text1" className="aishwarya-serif-title" />
+        <AishwaryaText {...props} elementKey="text2" className="aishwarya-event-copy" />
+        <AishwaryaButton {...props} elementKey="url1" />
+        <AishwaryaText {...props} elementKey="text3" className="aishwarya-event-copy" />
+        <AishwaryaButton {...props} elementKey="url2" />
+      </div>
+      <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+    </section>
+  )
+}
+
+function AishwaryaLiveStreaming(props: AishwaryaProps) {
+  return (
+    <section className="aishwarya-section aishwarya-live">
+      <AishwaryaText {...props} elementKey="text1" className="aishwarya-script-title" />
+      <img className="aishwarya-live-photo" src={resolveApiAssetUrl(aishwaryaPicture('Heritage-Sandhayu-IMG_6435.webp'))} alt="" />
+      <AishwaryaText {...props} elementKey="text2" className="aishwarya-event-copy" />
+      <AishwaryaButton {...props} elementKey="url1" />
+      <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+    </section>
+  )
+}
+
+function AishwaryaGallery(props: AishwaryaProps) {
+  const gallery = getEditableElement(props.page, 'gallery') as SapatamuEditorGalleryElement | null
+  const items = gallery?.items?.length ? gallery.items : [
+    aishwaryaPicture('Heritage-Sandhayu-IMG_6427.webp'),
+    aishwaryaPicture('Heritage-Sandhayu-IMG_6428.webp'),
+    aishwaryaPicture('Heritage-Sandhayu-IMG_6430.webp'),
+    aishwaryaPicture('Heritage-Sandhayu-IMG_6434.webp'),
+  ]
+  return (
+    <section id="gallery" className="aishwarya-section aishwarya-gallery">
+      <AishwaryaText {...props} elementKey="text1" className="aishwarya-script-title" />
+      <p className="aishwarya-gallery-quote">“I was created in time to fill your time, and I use all the time in my life to love you.”</p>
+      <div className="aishwarya-video-fallback">
+        <ReactPlayer
+          src={resolveApiAssetUrl(AISHWARYA_ORIGINAL_BASE + '/videos/MOTION-SANDHAYU-CUT.mp4')}
+          width="100%"
+          height="100%"
+          controls
+        />
+      </div>
+      <div className="aishwarya-photo-grid">
+        {items.slice(0, 8).map((src, index) => (
+          <button key={`${src}-${index}`} type="button" onClick={() => props.onOpenLightbox(index, items.slice(0, 8))}>
+            <img src={resolveApiAssetUrl(src)} alt="" />
+          </button>
+        ))}
+      </div>
+      <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+    </section>
+  )
+}
+
+function AishwaryaRsvp(props: AishwaryaProps) {
+  const [form, setForm] = useState({ name: props.rsvpInitialName ?? '', status: 'hadir', message: '' })
+  const [submitted, setSubmitted] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const submit = async () => {
+    if (!form.name.trim() || saving || props.isEditing) return
+    setSaving(true)
+    try {
+      const { dataCreate } = await import('@/lib/api')
+      await dataCreate('invitation-rsvps', {
+        invitation_id: props.invitationId,
+        guest_name: form.name.trim(),
+        status: form.status,
+        attendees_count: 1,
+        message: form.message.trim() || null,
+      })
+      if (form.message.trim()) {
+        await dataCreate('invitation-greetings', {
+          invitation_id: props.invitationId,
+          guest_name: form.name.trim(),
+          message: form.message.trim(),
+          is_approved: true,
+        })
+        props.onRsvpSubmitted?.({
+          id: `local-${Date.now()}`,
+          guestName: form.name.trim(),
+          message: form.message.trim(),
+          createdAt: new Date().toISOString(),
+        })
+      }
+      setSubmitted(true)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section id="rsvp" className="aishwarya-section aishwarya-rsvp">
+      <AishwaryaText {...props} elementKey="text1" className="aishwarya-script-title" />
+      <p className="aishwarya-rsvp-intro">Bagi tamu undangan yang akan hadir di acara pernikahan kami, silahkan kirimkan konfirmasi kehadiran dengan mengisi form berikut.</p>
+      <div className="aishwarya-rsvp-form">
+        {submitted ? (
+          <div className="aishwarya-rsvp-thanks">Terima kasih. Konfirmasi Anda sudah terkirim.</div>
+        ) : (
+          <>
+            <label>Nama</label>
+            <input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
+            <label>Konfirmasi Kehadiran</label>
+            <div className="aishwarya-rsvp-choice">
+              {[
+                ['hadir', 'Hadir'],
+                ['tidak', 'Tidak Hadir'],
+              ].map(([value, label]) => (
+                <button key={value} type="button" data-active={form.status === value} onClick={() => setForm((current) => ({ ...current, status: value }))}>{label}</button>
+              ))}
+            </div>
+            <label>Doa & Ucapan</label>
+            <textarea value={form.message} onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))} />
+            <button type="button" className="aishwarya-rsvp-submit" disabled={!form.name.trim() || saving} onClick={() => void submit()}>
+              {saving ? 'Mengirim...' : 'Kirim'}
+            </button>
+          </>
+        )}
+      </div>
+      <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+    </section>
+  )
+}
+
+function AishwaryaGift(props: AishwaryaProps) {
+  const registry = vintageRecord(props.page.data.vintageGiftRegistry)
+  const recommendations = Array.isArray(registry.recommendations)
+    ? registry.recommendations.map((item) => vintageRecord(item)).filter((item) => item.title || item.image)
+    : []
+  const giftAccounts = props.giftAccounts ?? []
+  const [visiblePanel, setVisiblePanel] = useState<string>(vintageString(registry.defaultVisiblePanel) || 'none')
+  const copyText = (value: string) => {
+    if (!value || typeof navigator === 'undefined') return
+    void navigator.clipboard?.writeText(value).catch(() => undefined)
+  }
+
+  return (
+    <section id="gift" className="aishwarya-section aishwarya-gift">
+      <img className="aishwarya-gift-photo" src={resolveApiAssetUrl(aishwaryaPicture('Heritage-Sandhayu-IMG_6435.webp'))} alt="" />
+      <AishwaryaText {...props} elementKey="text1" className="aishwarya-script-title" />
+      <div className="aishwarya-gift-copy">
+        <EditorSimpleCardPreview
+          page={props.page}
+          elementKey="gift"
+          element={getEditableElement(props.page, 'gift') as SapatamuEditorGiftElement}
+          selectedElement={props.selectedElement}
+          invitationId={props.invitationId}
+          isEditing={props.isEditing}
+        />
+      </div>
+      <div className="aishwarya-gift-actions">
+        <button type="button" className="aishwarya-button" onClick={() => setVisiblePanel((current) => current === 'gift-list' ? 'none' : 'gift-list')}>
+          E-Amplop
+        </button>
+        <button type="button" className="aishwarya-button aishwarya-button-dark" onClick={() => setVisiblePanel((current) => current === 'confirmation-form' ? 'none' : 'confirmation-form')}>
+          Gift Registry
+        </button>
+      </div>
+      {visiblePanel === 'gift-list' ? (
+        <div className="aishwarya-gift-panel">
+          {giftAccounts.length ? giftAccounts.map((account, index) => (
+            <div key={`${account.bankName}-${account.accountNumber}-${index}`} className="aishwarya-gift-account">
+              <strong>{account.bankName || 'Bank'}</strong>
+              <span>{account.accountNumber || '-'}</span>
+              <small>{account.accountHolder || 'Nama pemilik rekening'}</small>
+              <button type="button" onClick={() => copyText(account.accountNumber ?? '')}>Salin</button>
+            </div>
+          )) : (
+            <div className="aishwarya-gift-account">
+              <strong>Amplop Digital</strong>
+              <span>Nomor rekening akan tampil di sini</span>
+              <small>Atur rekening melalui panel Wedding Gift.</small>
+            </div>
+          )}
+          {props.giftAddress ? (
+            <div className="aishwarya-gift-account">
+              <strong>Alamat Pengiriman</strong>
+              <span>{props.giftAddress}</span>
+              <button type="button" onClick={() => copyText(props.giftAddress ?? '')}>Salin</button>
+            </div>
+          ) : null}
+          {recommendations.length ? (
+            <div className="aishwarya-gift-recommendations">
+              {recommendations.map((item, index) => (
+                <div key={`${vintageString(item.title)}-${index}`}>
+                  {vintageString(item.image) ? <img src={resolveApiAssetUrl(vintageString(item.image))} alt="" /> : null}
+                  <span>{vintageString(item.title)}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {visiblePanel === 'confirmation-form' ? (
+        <div className="aishwarya-gift-panel aishwarya-gift-confirmation">
+          <label>Nama</label>
+          <input />
+          <label>Nominal / Hadiah</label>
+          <input />
+          <label>Pesan</label>
+          <textarea />
+          <button type="button" className="aishwarya-rsvp-submit">Konfirmasi via WhatsApp</button>
+        </div>
+      ) : null}
+      <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+    </section>
+  )
+}
+
+function AishwaryaThanks(props: AishwaryaProps) {
+  return (
+    <section className="aishwarya-section aishwarya-thanks">
+      <AishwaryaText {...props} elementKey="text1" className="aishwarya-script-title" />
+      <AishwaryaText {...props} elementKey="text2" className="aishwarya-lead" />
+      <AishwaryaText {...props} elementKey="text3" className="aishwarya-script-title aishwarya-thanks-names" />
+      <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+    </section>
+  )
+}
+
+function AishwaryaSimpleSection(props: AishwaryaProps) {
+  const imageElement = getEditableElement(props.page, 'image1') as SapatamuEditorImageElement | null
+  return (
+    <section className="aishwarya-section aishwarya-simple">
+      {imageElement && !imageElement.disabled && imageElement.type === 'image' ? (
+        <img className="aishwarya-simple-image" src={resolveApiAssetUrl(imageElement.content)} alt="" />
+      ) : null}
+      <AishwaryaText {...props} elementKey="text1" className="aishwarya-script-title" />
+      <AishwaryaText {...props} elementKey="text2" className="aishwarya-lead" />
+      <VintageThemeExtras page={props.page} />
+      <AishwaryaButton {...props} elementKey="button" />
+      <AishwaryaButton {...props} elementKey="url1" />
+      <AishwaryaFloatingActions onVintageNavigate={props.onVintageNavigate} onMusicToggle={props.onMusicToggle} isMusicPlaying={props.isMusicPlaying} />
+    </section>
   )
 }
 
@@ -1939,9 +2829,11 @@ function NumberField(props: {
 }) {
   const step = props.step ?? 1
   const clamp = (nextValue: number) => {
-    const withMin = props.min === undefined ? nextValue : Math.max(props.min, nextValue)
+    const normalizedValue = Number.isFinite(nextValue) && step >= 1 ? Math.round(nextValue) : nextValue
+    const withMin = props.min === undefined ? normalizedValue : Math.max(props.min, normalizedValue)
     return props.max === undefined ? withMin : Math.min(props.max, withMin)
   }
+  const displayValue = step >= 1 && Number.isFinite(props.value) ? Math.round(props.value) : props.value
 
   return (
     <div className="flex h-11 items-center rounded-full border border-slate-200 bg-white px-2">
@@ -1954,7 +2846,7 @@ function NumberField(props: {
       </button>
       <Input
         type="number"
-        value={props.value}
+        value={displayValue}
         min={props.min}
         max={props.max}
         step={step}
@@ -1981,19 +2873,23 @@ function SliderField(props: {
   step?: number
   suffix?: string
 }) {
+  const step = props.step ?? 1
+  const normalize = (nextValue: number) => (Number.isFinite(nextValue) && step >= 1 ? Math.round(nextValue) : nextValue)
+  const value = normalize(props.value)
+
   return (
     <div className="grid grid-cols-[1fr_80px] items-center gap-4">
       <input
         type="range"
         min={props.min ?? 0}
         max={props.max ?? 100}
-        step={props.step ?? 1}
-        value={props.value}
-        onChange={(event) => props.onChange(Number(event.target.value))}
+        step={step}
+        value={value}
+        onChange={(event) => props.onChange(normalize(Number(event.target.value)))}
         className="sapatamu-editor-range"
       />
       <div className="text-right text-base font-medium text-slate-900">
-        {props.value}
+        {value}
         {props.suffix ? <span className="ml-2 text-sm">{props.suffix}</span> : null}
       </div>
     </div>
@@ -2042,9 +2938,9 @@ function AnimationControls(props: {
       <InspectorSection title="Speed">
         <SliderField
           value={props.duration}
-          min={0.5}
+          min={1}
           max={8}
-          step={0.5}
+          step={1}
           suffix="s"
           onChange={props.onDurationChange}
         />
@@ -2159,8 +3055,8 @@ function InspectorTextControls(props: {
         <ControlRow label="Line Height">
           <NumberField
             value={element.lineHeight}
-            min={0.5}
-            step={0.1}
+            min={1}
+            step={1}
             onChange={(value) => onPageField(`data.${elementKey}.lineHeight`, value)}
           />
         </ControlRow>
@@ -2729,9 +3625,45 @@ function InspectorGalleryControls(props: {
   element: SapatamuEditorGalleryElement
   elementKey: string
   onPageField: (path: string, value: unknown) => void
-  onOpenMedia: () => void
+  onOpenMedia: (slotIndex?: number) => void
 }) {
   const { element, elementKey, onPageField, onOpenMedia } = props
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [openAdjustmentIndex, setOpenAdjustmentIndex] = useState<number | null>(null)
+  const layoutVariant = getGalleryLayoutVariant(element.variant)
+  const slots = Array.from({ length: layoutVariant.slotCount }, (_, index) => element.items[index] ?? '')
+  const imageAdjustments = element.imageAdjustments ?? []
+
+  const updateItems = (items: string[]) => {
+    onPageField(`data.${elementKey}.items`, items.filter(Boolean).slice(0, layoutVariant.slotCount))
+  }
+
+  const removeItem = (index: number) => {
+    updateItems(element.items.filter((_, itemIndex) => itemIndex !== index))
+    onPageField(`data.${elementKey}.imageAdjustments`, imageAdjustments.filter((_, itemIndex) => itemIndex !== index))
+    setOpenAdjustmentIndex((current) => {
+      if (current === null) return null
+      if (current === index) return null
+      return current > index ? current - 1 : current
+    })
+  }
+
+  const reorderItem = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || !element.items[fromIndex]) return
+    updateItems(arrayMove(element.items.slice(0, layoutVariant.slotCount), fromIndex, toIndex))
+    onPageField(`data.${elementKey}.imageAdjustments`, arrayMove(imageAdjustments.slice(0, layoutVariant.slotCount), fromIndex, toIndex))
+  }
+
+  const updateAdjustment = (index: number, patch: { x?: number; y?: number; zoom?: number }) => {
+    const next = Array.from({ length: layoutVariant.slotCount }, (_, itemIndex) => ({
+      x: 0,
+      y: 0,
+      zoom: 1,
+      ...(imageAdjustments[itemIndex] ?? {}),
+    }))
+    next[index] = { ...next[index], ...patch }
+    onPageField(`data.${elementKey}.imageAdjustments`, next.slice(0, element.items.length))
+  }
 
   return (
     <div className="space-y-5">
@@ -2742,64 +3674,136 @@ function InspectorGalleryControls(props: {
           onChange={(event) => onPageField(`data.${elementKey}.title`, event.target.value)}
         />
       </ControlRow>
-      <div className="grid grid-cols-2 gap-3">
-        <ControlRow label="Columns">
-          <Input
-            type="number"
-            className={INPUT_CLASS}
-            value={element.columns}
-            onChange={(event) => onPageField(`data.${elementKey}.columns`, Number(event.target.value))}
-          />
-        </ControlRow>
-        <ControlRow label="Gallery Items">
-          <Button type="button" variant="outline" className="w-full rounded-xl" onClick={onOpenMedia}>
-            <ImagePlus className="mr-2 size-4" />
-            Tambah dari Media
-          </Button>
-        </ControlRow>
-      </div>
-      <ControlRow label="Bento Template">
+      <ControlRow label="Variasi">
         <div className="grid grid-cols-2 gap-2">
-          {GALLERY_VARIANTS.map((variant) => (
+          {GALLERY_LAYOUT_VARIANTS.map((variant) => (
             <button
-              key={variant.value}
+              key={variant.id}
               type="button"
               className={cn(
-                'rounded-xl border px-3 py-2 text-left text-xs font-semibold transition-colors',
-                (element.variant ?? 'bento-feature-left') === variant.value
+                'overflow-hidden rounded-xl border bg-white text-left text-xs font-semibold transition-colors',
+                layoutVariant.id === variant.id
                   ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
                   : 'border-slate-200 bg-white text-slate-600',
               )}
-              onClick={() => onPageField(`data.${elementKey}.variant`, variant.value)}
+              onClick={() => {
+                onPageField(`data.${elementKey}.variant`, variant.id)
+                if (element.items.length > variant.slotCount) {
+                  onPageField(`data.${elementKey}.items`, element.items.slice(0, variant.slotCount))
+                  onPageField(`data.${elementKey}.imageAdjustments`, imageAdjustments.slice(0, variant.slotCount))
+                }
+              }}
             >
-              {variant.label}
+              <img src={variant.previewImage} alt="" className="h-16 w-full bg-slate-100 object-cover" />
+              <span className="block px-3 pt-2">{variant.label}</span>
+              <span className="block px-3 pb-2 text-[11px] font-medium text-slate-500">{variant.slotCount} slot</span>
             </button>
           ))}
         </div>
       </ControlRow>
       <div className="space-y-2">
-        {element.items.map((item, index) => (
-          <div key={`${item}-${index}`} className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2">
-            <span className="truncate text-xs text-slate-600">{item}</span>
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              className="ml-auto"
-              onClick={() =>
-                onPageField(
-                  `data.${elementKey}.items`,
-                  element.items.filter((_, itemIndex) => itemIndex !== index),
-                )
-              }
+        <div className="flex items-center justify-between gap-3">
+          <Label className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Slot Foto</Label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-xl"
+            disabled={element.items.length >= layoutVariant.slotCount}
+            onClick={() => onOpenMedia(Math.min(element.items.length, layoutVariant.slotCount - 1))}
+          >
+            <ImagePlus className="mr-2 size-4" />
+            Tambah
+          </Button>
+        </div>
+        {slots.map((item, index) => {
+          const adjustment = {
+            x: 0,
+            y: 0,
+            zoom: 1,
+            ...(imageAdjustments[index] ?? {}),
+          }
+
+          return (
+            <div
+              key={`${item || 'empty'}-${index}`}
+              className="space-y-3 rounded-xl bg-slate-100 p-2"
+              draggable={Boolean(item)}
+              onDragStart={() => setDragIndex(index)}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={() => {
+                if (dragIndex === null) return
+                reorderItem(dragIndex, index)
+                setDragIndex(null)
+              }}
+              onDragEnd={() => setDragIndex(null)}
             >
-              <Trash2 className="size-4" />
-            </Button>
-          </div>
-        ))}
-        {element.items.length === 0 ? (
-          <p className="text-xs text-slate-500">Jika kosong, preview akan memakai fallback dari media library.</p>
-        ) : null}
+              <div className="flex items-center gap-3">
+                <GripVertical className={cn('size-4 shrink-0 text-slate-400', item ? 'cursor-grab' : 'opacity-30')} />
+                {item ? (
+                  <>
+                    <div className="size-14 overflow-hidden rounded-lg bg-white">
+                      <img
+                        src={resolveApiAssetUrl(item)}
+                        alt=""
+                        className="size-full object-cover"
+                        style={{
+                          objectPosition: `${50 + Number(adjustment.x ?? 0)}% ${50 + Number(adjustment.y ?? 0)}%`,
+                          transform: `scale(${Number(adjustment.zoom ?? 1)})`,
+                        }}
+                      />
+                    </div>
+                    <span className="min-w-0 flex-1 text-xs font-semibold text-slate-700">Foto {index + 1}</span>
+                    <Button type="button" size="sm" variant="outline" className="rounded-xl" onClick={() => onOpenMedia(index)}>
+                      Replace
+                    </Button>
+                    <Button type="button" size="icon-sm" variant="ghost" onClick={() => removeItem(index)}>
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid size-14 place-items-center rounded-lg border border-dashed border-slate-300 bg-white text-slate-400">
+                      <ImagePlus className="size-5" />
+                    </div>
+                    <span className="min-w-0 flex-1 text-xs font-medium text-slate-500">Slot kosong</span>
+                    <Button type="button" size="sm" variant="outline" className="rounded-xl" onClick={() => onOpenMedia(index)}>
+                      Pilih Foto
+                    </Button>
+                  </>
+                )}
+              </div>
+              {item ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-between rounded-lg bg-white px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                    aria-expanded={openAdjustmentIndex === index}
+                    onClick={() => setOpenAdjustmentIndex((current) => (current === index ? null : index))}
+                  >
+                    <span>Atur posisi</span>
+                    <ChevronDown className={cn('size-4 transition-transform', openAdjustmentIndex === index ? 'rotate-180' : '')} />
+                  </Button>
+                  {openAdjustmentIndex === index ? (
+                    <div className="grid gap-3 rounded-lg bg-white p-3">
+                      <ControlRow label="Geser X">
+                        <SliderField value={Number(adjustment.x ?? 0)} min={-50} max={50} suffix="%" onChange={(value) => updateAdjustment(index, { x: value })} />
+                      </ControlRow>
+                      <ControlRow label="Geser Y">
+                        <SliderField value={Number(adjustment.y ?? 0)} min={-50} max={50} suffix="%" onChange={(value) => updateAdjustment(index, { y: value })} />
+                      </ControlRow>
+                      <ControlRow label="Zoom">
+                        <SliderField value={Number(adjustment.zoom ?? 1)} min={1} max={2} step={0.05} suffix="x" onChange={(value) => updateAdjustment(index, { zoom: value })} />
+                      </ControlRow>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -2928,6 +3932,12 @@ function InspectorStoryControls(props: {
         </ControlRow>
       </InspectorSection>
 
+      <PaddingControls
+        elementKey={elementKey}
+        padding={element.padding}
+        onPageField={onPageField}
+      />
+
       {element.items.map((item, index) => (
         <InspectorSection key={index} title={`Cerita ${index + 1}`}>
           <ControlRow label="Judul Cerita">
@@ -2993,7 +4003,7 @@ function InspectorStoryControls(props: {
 }
 
 function InspectorCreditControls(props: {
-  element: { type: 'credit'; title: string; description: string; disabled: boolean }
+  element: { type: 'credit'; title: string; description: string; disabled: boolean; padding: SapatamuEditorPadding }
   elementKey: string
   onPageField: (path: string, value: unknown) => void
 }) {
@@ -3018,6 +4028,11 @@ function InspectorCreditControls(props: {
           />
         </ControlRow>
       </InspectorSection>
+      <PaddingControls
+        elementKey={elementKey}
+        padding={element.padding}
+        onPageField={onPageField}
+      />
     </div>
   )
 }
@@ -3245,12 +4260,13 @@ function SectionInspector(props: {
           element={element as SapatamuEditorGalleryElement}
           elementKey={selectedElement}
           onPageField={(path, value) => onPageField(path, value)}
-          onOpenMedia={() =>
+          onOpenMedia={(slotIndex) =>
             onOpenMedia({
               kind: 'element-gallery',
               pageUniqueId: page.uniqueId,
               elementKey: selectedElement,
               mediaType: 'image',
+              slotIndex,
             })
           }
         />
@@ -3319,7 +4335,7 @@ function SectionInspector(props: {
     case 'credit':
       return (
         <InspectorCreditControls
-          element={element as { type: 'credit'; title: string; description: string; disabled: boolean }}
+          element={element as { type: 'credit'; title: string; description: string; disabled: boolean; padding: SapatamuEditorPadding }}
           elementKey={selectedElement}
           onPageField={(path, value) => onPageField(path, value)}
         />
@@ -3414,11 +4430,15 @@ function ThemeSettingsPanel(props: {
         Pilih tema dari catalog Sapatamu. Apply theme akan mengganti struktur layout dan asset sesuai template,
         sementara data mempelai dan acara tetap dipertahankan.
       </p>
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        Untuk sementara hanya tema Signature/Premium yang bisa dipakai. Tema Basic dan Vintage ditampilkan sebagai Coming soon.
+      </div>
       <div className="space-y-3">
         {themes.map((theme) => {
           const preset = getThemePreset(theme.code)
           const previewImage = theme.previewImageUrl || preset.previewImage
           const isActive = props.documentValue?.selectedTheme === theme.code
+          const isComingSoon = isThemeComingSoon(theme)
 
           return (
             <button
@@ -3427,23 +4447,30 @@ function ThemeSettingsPanel(props: {
               className={`w-full overflow-hidden rounded-2xl border text-left transition ${
                 isActive
                   ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
-                  : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+                  : isComingSoon
+                    ? 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500 opacity-75'
+                    : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
               }`}
-              disabled={props.isSaving || isActive}
-              onClick={() => props.onApplyTheme(theme.id)}
+              disabled={props.isSaving || isActive || isComingSoon}
+              onClick={() => {
+                if (!isComingSoon) props.onApplyTheme(theme.id)
+              }}
             >
               <div className="grid grid-cols-[92px_1fr] gap-3 p-3">
                 <div className="h-24 overflow-hidden rounded-xl bg-slate-100">
                   <img
                     src={resolveApiAssetUrl(previewImage)}
                     alt={theme.name}
-                    className="size-full object-cover"
+                    className={`size-full object-cover ${isComingSoon ? 'grayscale' : ''}`}
                   />
                 </div>
                 <div className="min-w-0 py-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant={isActive ? 'default' : 'outline'}>{resolveThemeGroup(theme)}</Badge>
                     {isActive ? <Badge variant="outline">Aktif</Badge> : null}
+                    {isComingSoon ? (
+                      <Badge className="border-0 bg-amber-100 text-amber-800">{getThemeReleaseLabel(theme)}</Badge>
+                    ) : null}
                   </div>
                   <p className="mt-2 text-sm font-semibold leading-5">{theme.name}</p>
                   <p className="mt-1 line-clamp-2 text-xs font-normal leading-5 text-slate-500">
@@ -3520,14 +4547,14 @@ function BackgroundSettingsPanel(props: {
 
   const sectionToggle = (path: string, checked: boolean) => props.onGlobalField(`editor.globalBackgroundDetails.hero.${path}.enabled`, checked)
   const sectionText = (path: string, value: string) => props.onGlobalField(`editor.globalBackgroundDetails.hero.${path}.text`, value)
-  const sectionNumber = (path: string, key: 'x' | 'y' | 'size', value: number) =>
-    props.onGlobalField(`editor.globalBackgroundDetails.hero.${path}.${key}`, value)
+  const sectionNumber = (path: string, key: 'x' | 'y' | 'size' | 'lineHeight', value: number) =>
+    props.onGlobalField(`editor.globalBackgroundDetails.hero.${path}.${key}`, Math.round(value))
   const selectedElement = props.selectedElement
   const getHeroNode = (path: BackgroundHeroElementKey) =>
     path.split('.').reduce<unknown>((current, segment) => {
       if (!current || typeof current !== 'object') return undefined
       return (current as Record<string, unknown>)[segment]
-    }, hero) as { enabled?: boolean; text?: string; url?: string; x?: number; y?: number; size?: number } | undefined
+    }, hero) as { enabled?: boolean; text?: string; url?: string; x?: number; y?: number; size?: number; lineHeight?: number } | undefined
   const selectedNode = selectedElement ? getHeroNode(selectedElement) : undefined
   const selectedValue =
     selectedElement === 'left.photo'
@@ -3611,16 +4638,18 @@ function BackgroundSettingsPanel(props: {
                 <ControlRow label="X">
                   <Input
                     type="number"
+                    step={1}
                     className={INPUT_CLASS}
-                    value={selectedNode?.x ?? 0}
+                    value={Math.round(selectedNode?.x ?? 0)}
                     onChange={(event) => sectionNumber(selectedElement, 'x', Number(event.target.value))}
                   />
                 </ControlRow>
                 <ControlRow label="Y">
                   <Input
                     type="number"
+                    step={1}
                     className={INPUT_CLASS}
-                    value={selectedNode?.y ?? 0}
+                    value={Math.round(selectedNode?.y ?? 0)}
                     onChange={(event) => sectionNumber(selectedElement, 'y', Number(event.target.value))}
                   />
                 </ControlRow>
@@ -3629,12 +4658,26 @@ function BackgroundSettingsPanel(props: {
                     type="number"
                     min={20}
                     max={240}
+                    step={1}
                     className={INPUT_CLASS}
-                    value={selectedNode?.size ?? 100}
+                    value={Math.round(selectedNode?.size ?? 100)}
                     onChange={(event) => sectionNumber(selectedElement, 'size', Number(event.target.value))}
                   />
                 </ControlRow>
               </div>
+              {!selectedElement.endsWith('.photo') ? (
+                <ControlRow label="Line Height">
+                  <Input
+                    type="number"
+                    min={5}
+                    max={50}
+                    step={1}
+                    className={INPUT_CLASS}
+                    value={getHeroLineHeightValue(selectedNode?.lineHeight)}
+                    onChange={(event) => sectionNumber(selectedElement, 'lineHeight', Math.round(Number(event.target.value)))}
+                  />
+                </ControlRow>
+              ) : null}
             </InspectorSection>
           </div>
         ) : (
@@ -3741,6 +4784,7 @@ export function CmsSapatamuEditor() {
   const [mediaDialogOpen, setMediaDialogOpen] = useState(false)
   const [mediaTarget, setMediaTarget] = useState<MediaPickerTarget | null>(null)
   const [panelMode, setPanelMode] = useState<EditorPanelMode>('layouts')
+  const [activeLightboxImages, setActiveLightboxImages] = useState<string[]>([])
   const [emblaRef, emblaApi] = useEmblaCarousel({ axis: 'y', containScroll: 'trimSnaps', dragFree: false })
 
   const {
@@ -3779,10 +4823,10 @@ export function CmsSapatamuEditor() {
   )
   const lightboxSlides = useMemo(
     () =>
-      fallbackImages.map((item) => ({
+      (activeLightboxImages.length ? activeLightboxImages : fallbackImages).map((item) => ({
         src: resolveApiAssetUrl(item),
       })),
-    [fallbackImages],
+    [activeLightboxImages, fallbackImages],
   )
   const lockedLookup = useMemo(() => {
     return Object.fromEntries(
@@ -3881,7 +4925,13 @@ export function CmsSapatamuEditor() {
 
     if (mediaTarget.kind === 'element-gallery') {
       const currentElement = getEditableElement(page, mediaTarget.elementKey) as SapatamuEditorGalleryElement | null
-      const nextItems = [...(currentElement?.items ?? []), mediaUrl]
+      const slotCount = getGalleryLayoutVariant(currentElement?.variant).slotCount
+      const nextItems = [...(currentElement?.items ?? [])].slice(0, slotCount)
+      if (typeof mediaTarget.slotIndex === 'number') {
+        nextItems[mediaTarget.slotIndex] = mediaUrl
+      } else if (nextItems.length < slotCount) {
+        nextItems.push(mediaUrl)
+      }
       updatePageField(mediaTarget.pageUniqueId, `data.${mediaTarget.elementKey}.items`, nextItems)
     }
 
@@ -3954,7 +5004,7 @@ export function CmsSapatamuEditor() {
       : page.title
     : invitation.title
   const backgroundHero = (documentValue.editor.globalBackgroundDetails as { hero?: BackgroundHeroSettings }).hero
-  const stageBackgroundUrl = documentValue.editor.globalBackground
+  const stageBackgroundUrl = PUBLIC_SOURCE_THEME_BACKDROPS[documentValue.selectedTheme] || documentValue.editor.globalBackground
   const stageBackgroundType = documentValue.editor.globalBackgroundDetails?.type
   const previewStageStyle: CSSProperties =
     stageBackgroundUrl && stageBackgroundType !== 'video'
@@ -4203,9 +5253,13 @@ export function CmsSapatamuEditor() {
                       invitationLink={invitation.publicUrl}
                       fonts={catalog.fonts}
                       fallbackImages={fallbackImages}
-                      onOpenLightbox={(index) => setLightbox({ open: true, index })}
+                      onOpenLightbox={(index, items = fallbackImages) => {
+                        setActiveLightboxImages(items)
+                        setLightbox({ open: true, index })
+                      }}
                       isEditing={isLayoutEditMode && previewPage.slug === page.slug}
                       giftAccounts={documentValue.settings.giftAccounts}
+                      giftAddress={documentValue.settings.giftAddress}
                     />
                   </div>
                 ))}
@@ -4242,7 +5296,10 @@ export function CmsSapatamuEditor() {
 
       <Lightbox
         open={lightbox.open}
-        close={() => setLightbox({ open: false })}
+        close={() => {
+          setLightbox({ open: false })
+          setActiveLightboxImages([])
+        }}
         index={lightbox.index}
         slides={lightboxSlides}
       />

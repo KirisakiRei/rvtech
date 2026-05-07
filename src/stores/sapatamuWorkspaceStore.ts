@@ -47,6 +47,7 @@ interface SapatamuWorkspaceStore {
       musicValue?: string
       extraYoutube?: string
       giftAccounts?: SapatamuGiftAccount[]
+      giftAddress?: string
     },
   ) => Promise<void>
   uploadAlbumImage: (invitationId: string, file: File) => Promise<void>
