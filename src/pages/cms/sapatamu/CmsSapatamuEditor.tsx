@@ -92,8 +92,8 @@ type EditorGiftAccount = {
   accountHolder?: string
 }
 
-const SOURCE_THEME_IDS = new Set(['premium1', 'sarune-batak-sangria', ...PUBLIC_ADDITIONAL_SOURCE_THEME_IDS])
-const SOURCE_THEME_LAYOUT_PREFIXES = ['premium1', 'sarune', ...PUBLIC_ADDITIONAL_SOURCE_THEME_IDS.map((themeId) => themeId.split('-')[0])]
+const SOURCE_THEME_IDS = new Set(['malay-ethnic-red-ruby', 'batak-ethnic-maroon-mistyrose', ...PUBLIC_ADDITIONAL_SOURCE_THEME_IDS])
+const SOURCE_THEME_LAYOUT_PREFIXES = ['malay-ethnic-red-ruby', 'batak', ...PUBLIC_ADDITIONAL_SOURCE_THEME_IDS.map((themeId) => themeId.split('-')[0])]
 
 function isSourceThemePreview(themeId: string | undefined, layoutCode: string) {
   return Boolean(themeId && SOURCE_THEME_IDS.has(themeId)) || SOURCE_THEME_LAYOUT_PREFIXES.some((prefix) => layoutCode.startsWith(`${prefix}-`))
@@ -1657,7 +1657,7 @@ export function PreviewPage(props: {
 
   return (
     <div
-      className={`sapatamu-editor-page sapatamu-editor-surface-grid relative overflow-hidden rounded-[32px] px-6 py-10 text-center${isSourceTheme ? ` sapatamu-premium1-page sapatamu-source-theme-page${sourceThemeClass}` : ''}`}
+      className={`sapatamu-editor-page sapatamu-editor-surface-grid relative overflow-hidden rounded-[32px] px-6 py-10 text-center${isSourceTheme ? ` sapatamu-signature-page sapatamu-source-theme-page${sourceThemeClass}` : ''}`}
       style={backgroundStyle}
     >
       {backgroundType === 'video' && background ? (
@@ -1675,8 +1675,8 @@ export function PreviewPage(props: {
         </div>
       ) : null}
       <div className="absolute inset-0" style={overlayStyle} />
-      {isSourceTheme ? <Premium1CornerOrnaments corners={page.data.cornerElements?.list ?? []} /> : null}
-      <div className={`relative z-10 mx-auto flex max-w-[520px] flex-col gap-3${isSourceTheme ? ' sapatamu-premium1-content sapatamu-source-theme-content' : ''}`}>
+      {isSourceTheme ? <SignatureSourceCornerOrnaments corners={page.data.cornerElements?.list ?? []} /> : null}
+      <div className={`relative z-10 mx-auto flex max-w-[520px] flex-col gap-3${isSourceTheme ? ' sapatamu-signature-content sapatamu-source-theme-content' : ''}`}>
         {pageKeys.map((key) => {
           const candidate = getEditableElement(page, key)
           if (!candidate || candidate.disabled) return null
@@ -1871,19 +1871,19 @@ export function PreviewPage(props: {
   )
 }
 
-function Premium1CornerOrnaments(props: { corners: SapatamuEditorCornerElement[] }) {
+function SignatureSourceCornerOrnaments(props: { corners: SapatamuEditorCornerElement[] }) {
   const activeCorners = props.corners.filter((corner) => !corner.disabled && corner.url)
 
   if (!activeCorners.length) return null
 
   return (
-    <div className="sapatamu-premium1-corners" aria-hidden="true">
+    <div className="sapatamu-signature-corners" aria-hidden="true">
       {activeCorners.map((corner) => (
         <img
           key={corner.type}
           src={resolveApiAssetUrl(corner.url)}
           alt=""
-          className={`sapatamu-premium1-ornament sapatamu-premium1-ornament-${corner.type.replace('_', '-')} ${getEditorAnimationClass(corner.animation.style)}`}
+          className={`sapatamu-signature-ornament sapatamu-signature-ornament-${corner.type.replace('_', '-')} ${getEditorAnimationClass(corner.animation.style)}`}
           style={{ animationDuration: `${corner.animation.duration}s` }}
         />
       ))}

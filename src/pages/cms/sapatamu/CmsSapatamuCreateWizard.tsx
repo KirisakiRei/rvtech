@@ -69,7 +69,7 @@ function ThemeChooser({
               activeCategory === category ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground',
             )}
           >
-            {category === 'basic' ? 'Basic' : category === 'premium' ? 'Premium' : 'Vintage'}
+            {category === 'basic' ? 'Basic' : category === 'premium' ? 'Signature' : 'Vintage'}
           </button>
         ))}
       </div>
@@ -101,7 +101,7 @@ function ThemeChooser({
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-[10px] tracking-[0.16em] uppercase opacity-60">{resolveThemeGroup(theme)}</p>
                   <Badge className="border-0 bg-white/75 text-foreground">
-                    {activeCategory === 'basic' ? 'Basic' : activeCategory === 'premium' ? 'Premium' : 'Vintage'}
+                    {activeCategory === 'basic' ? 'Basic' : activeCategory === 'premium' ? 'Signature' : 'Vintage'}
                   </Badge>
                 </div>
                 <div>

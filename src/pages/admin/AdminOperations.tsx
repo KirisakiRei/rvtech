@@ -243,7 +243,7 @@ function AssetMetadataFields({
             <option key={slot} value={slot}>{slot || 'slot'}</option>
           ))}
         </select>
-        <Input placeholder="title, contoh: Munggah Sriwijaya" value={value.title} onChange={(event) => update('title', event.target.value)} />
+        <Input placeholder="title, contoh: Malay ethnic" value={value.title} onChange={(event) => update('title', event.target.value)} />
         <Input placeholder="label internal" value={value.label} onChange={(event) => update('label', event.target.value)} />
         <Input placeholder="opacity 0-1" type="number" step="0.05" min="0" max="1" value={value.opacity} onChange={(event) => update('opacity', event.target.value)} />
         <select className="h-10 rounded-xl border border-border bg-background px-3 text-sm" value={value.animationStyle} onChange={(event) => update('animationStyle', event.target.value)}>

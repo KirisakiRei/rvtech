@@ -150,10 +150,10 @@ const RSVP_OPTIONS = [
   { value: 'ragu', label: 'Ragu-ragu' },
 ] as const
 
-const SOURCE_THEME_IDS = new Set(['premium1', 'sarune-batak-sangria', ...PUBLIC_ADDITIONAL_SOURCE_THEME_IDS])
+const SOURCE_THEME_IDS = new Set(['malay-ethnic-red-ruby', 'batak-ethnic-maroon-mistyrose', ...PUBLIC_ADDITIONAL_SOURCE_THEME_IDS])
 
 const SOURCE_THEME_NAV_ICON_BY_FAMILY: Record<string, Record<string, string>> = {
-  premium1: {
+  'malay-ethnic-red-ruby': {
     opening: 'icons/opening',
     salam: 'icons/salam',
     quote: 'icons/quote',
@@ -172,7 +172,7 @@ const SOURCE_THEME_NAV_ICON_BY_FAMILY: Record<string, Record<string, string>> = 
     contact: 'icons/contact',
     thanks: 'icons/terimakasih',
   },
-  'sarune-batak-sangria': {
+  'batak-ethnic-maroon-mistyrose': {
     opening: 'icons/opening',
     salam: 'icons/salam',
     quote: 'icons/quote',
@@ -193,7 +193,7 @@ const SOURCE_THEME_NAV_ICON_BY_FAMILY: Record<string, Record<string, string>> = 
   },
 }
 
-const LEGACY_PREMIUM1_NAV_ICON_BY_FAMILY: Record<string, string> = {
+const SIGNATURE_NAV_ICON_BY_FAMILY: Record<string, string> = {
   opening: 'opening',
   salam: 'salam',
   quote: 'quote',
@@ -238,7 +238,7 @@ function getSourceThemeNavIcon(themeId: string, page: SapatamuEditorPage): strin
   const icon =
     themeIcons?.[page.family] ??
     SOURCE_THEME_DEFAULT_NAV_ICON_BY_FAMILY[page.family] ??
-    `icons/${LEGACY_PREMIUM1_NAV_ICON_BY_FAMILY[page.family] ?? 'opening'}`
+    `icons/${SIGNATURE_NAV_ICON_BY_FAMILY[page.family] ?? 'opening'}`
   return `/sapatamu-themes/${themeId}/original/${icon}.svg`
 }
 
@@ -292,7 +292,7 @@ export function TenantWeddingPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [invitationId, setInvitationId] = useState<string | null>(null)
-  const [selectedTheme, setSelectedTheme] = useState<WeddingThemeId>('premium1')
+  const [selectedTheme, setSelectedTheme] = useState<WeddingThemeId>('malay-ethnic-red-ruby')
   const [weddingData, setWeddingData] = useState<Partial<WeddingDetail>>(DEFAULT_WEDDING_DATA)
   const [editorDocument, setEditorDocument] = useState<SapatamuEditorDocumentV3 | null>(null)
   const [gallery, setGallery] = useState<InvitationMediaRow[]>([])
@@ -446,7 +446,7 @@ export function TenantWeddingPage() {
         )
 
         setInvitationId(slugRow.invitation_id)
-        setSelectedTheme(content?.selectedTheme ?? 'premium1')
+        setSelectedTheme(content?.selectedTheme ?? 'malay-ethnic-red-ruby')
         setGallery(mediaResponse.data?.items ?? [])
         setGuestMessages((greetingResponse.data?.items ?? []).map((item) => ({
           id: item.id,
@@ -670,7 +670,7 @@ export function TenantWeddingPage() {
 
       return (
         <div
-          className="sapatamu-public-theme-preview sapatamu-public-premium1-preview sapatamu-public-source-preview min-h-screen"
+          className="sapatamu-public-theme-preview sapatamu-public-signature-preview sapatamu-public-source-preview min-h-screen"
           style={publicStageStyle}
         >
           <div className="sapatamu-public-embla" ref={publicEmblaRef}>
@@ -708,14 +708,14 @@ export function TenantWeddingPage() {
           ) : null}
 
           {editorDocument.editor.navMenu.enabled && activeEditorPages.length > 1 ? (
-            <nav className="sapatamu-public-premium1-nav" aria-label="Navigasi undangan">
+            <nav className="sapatamu-public-signature-nav" aria-label="Navigasi undangan">
               {activeEditorPages.map((page, index) => {
                 const isActive = index === publicPageIndex
                 return (
                   <button
                     key={page.uniqueId}
                     type="button"
-                    className="sapatamu-public-premium1-nav-button"
+                    className="sapatamu-public-signature-nav-button"
                     data-active={isActive}
                     aria-label={page.title}
                     title={page.title}

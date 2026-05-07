@@ -649,7 +649,7 @@
   animation-fill-mode: both;
 }
 
-.sapatamu-premium1-page {
+.sapatamu-signature-page {
   min-height: 720px;
   padding: 0 !important;
   border-radius: 0 !important;
@@ -661,15 +661,15 @@
   box-shadow: none;
 }
 
-.sapatamu-premium1-page::before {
+.sapatamu-signature-page::before {
   content: none;
 }
 
-.sapatamu-premium1-page::after {
+.sapatamu-signature-page::after {
   content: none;
 }
 
-.sapatamu-premium1-content {
+.sapatamu-signature-content {
   width: 100%;
   min-height: 720px;
   justify-content: center;
@@ -678,17 +678,17 @@
   text-shadow: none;
 }
 
-.sapatamu-editor-live-canvas .sapatamu-premium1-content {
+.sapatamu-editor-live-canvas .sapatamu-signature-content {
   min-height: 100%;
 }
 
-.sapatamu-public-theme-preview .sapatamu-premium1-content {
+.sapatamu-public-theme-preview .sapatamu-signature-content {
   height: 100%;
   min-height: 100%;
 }
 
 
-.sapatamu-public-premium1-preview {
+.sapatamu-public-signature-preview {
   position: relative;
   height: 100vh;
   height: 100dvh;
@@ -714,7 +714,7 @@
 }
 
 
-.sapatamu-public-premium1-preview .sapatamu-premium1-page {
+.sapatamu-public-signature-preview .sapatamu-signature-page {
   width: min(430px, 100%);
   height: 100%;
   min-height: 100%;
@@ -722,7 +722,7 @@
 }
 
 
-.sapatamu-public-premium1-nav {
+.sapatamu-public-signature-nav {
   position: fixed;
   bottom: 12px;
   left: 50%;
@@ -740,7 +740,7 @@
   backdrop-filter: blur(14px);
 }
 
-.sapatamu-public-premium1-nav-button {
+.sapatamu-public-signature-nav-button {
   display: grid;
   width: 32px;
   height: 32px;
@@ -755,12 +755,12 @@
     transform 180ms ease;
 }
 
-.sapatamu-public-premium1-nav-button[data-active='true'] {
+.sapatamu-public-signature-nav-button[data-active='true'] {
   opacity: 1;
   transform: scale(1.08);
 }
 
-.sapatamu-public-premium1-nav-button img {
+.sapatamu-public-signature-nav-button img {
   width: 14px;
   height: 14px;
   object-fit: contain;
@@ -778,7 +778,7 @@
   line-height: inherit !important;
 }
 
-.sapatamu-premium1-content .editor-preview-glass {
+.sapatamu-signature-content .editor-preview-glass {
   border: 1px solid rgba(211, 169, 175, 0.34);
   border-radius: 8px;
   background:
@@ -786,19 +786,19 @@
   box-shadow: 0 16px 44px rgba(22, 6, 8, 0.28);
 }
 
-.sapatamu-premium1-content a > div,
-.sapatamu-premium1-content [style*='border-radius: 999px'] {
+.sapatamu-signature-content a > div,
+.sapatamu-signature-content [style*='border-radius: 999px'] {
   box-shadow: 0 10px 30px rgba(22, 6, 8, 0.3);
 }
 
-.sapatamu-premium1-corners {
+.sapatamu-signature-corners {
   position: absolute;
   inset: 0;
   z-index: 4;
   pointer-events: none;
 }
 
-.sapatamu-premium1-ornament {
+.sapatamu-signature-ornament {
   position: absolute;
   width: auto;
   max-width: none;
@@ -807,70 +807,70 @@
   filter: none;
 }
 
-.sapatamu-premium1-ornament-top-left {
+.sapatamu-signature-ornament-top-left {
   top: 0;
   left: 0;
   width: 100%;
 }
 
-.sapatamu-premium1-ornament-top-right {
+.sapatamu-signature-ornament-top-right {
   top: 0;
   right: 0;
   width: 58%;
 }
 
-.sapatamu-premium1-ornament-bottom-left {
+.sapatamu-signature-ornament-bottom-left {
   bottom: 0;
   left: 0;
   width: 58%;
 }
 
-.sapatamu-premium1-ornament-bottom-right {
+.sapatamu-signature-ornament-bottom-right {
   right: 0;
   bottom: 0;
   width: 58%;
 }
 
-.sapatamu-source-theme-page .sapatamu-premium1-ornament {
+.sapatamu-source-theme-page .sapatamu-signature-ornament {
   width: 60%;
 }
 
-.sapatamu-source-theme-page .sapatamu-premium1-ornament-top-left {
+.sapatamu-source-theme-page .sapatamu-signature-ornament-top-left {
   top: 0;
   left: 0;
   translate: -33.333% -33.333%;
   transform-origin: 33.333% 33.333%;
 }
 
-.sapatamu-source-theme-page .sapatamu-premium1-ornament-top-right {
+.sapatamu-source-theme-page .sapatamu-signature-ornament-top-right {
   top: 0;
   right: 0;
   translate: 33.333% -33.333%;
   transform-origin: 66.667% 33.333%;
 }
 
-.sapatamu-source-theme-page .sapatamu-premium1-ornament-middle-left {
+.sapatamu-source-theme-page .sapatamu-signature-ornament-middle-left {
   top: 50%;
   left: 0;
   translate: -33.333% -50%;
   transform-origin: 33.333% 50%;
 }
 
-.sapatamu-source-theme-page .sapatamu-premium1-ornament-middle-right {
+.sapatamu-source-theme-page .sapatamu-signature-ornament-middle-right {
   top: 50%;
   right: 0;
   translate: 33.333% -50%;
   transform-origin: 66.667% 50%;
 }
 
-.sapatamu-source-theme-page .sapatamu-premium1-ornament-bottom-left {
+.sapatamu-source-theme-page .sapatamu-signature-ornament-bottom-left {
   bottom: 0;
   left: 0;
   translate: -33.333% 33.333%;
   transform-origin: 33.333% 66.667%;
 }
 
-.sapatamu-source-theme-page .sapatamu-premium1-ornament-bottom-right {
+.sapatamu-source-theme-page .sapatamu-signature-ornament-bottom-right {
   right: 0;
   bottom: 0;
   translate: 33.333% 33.333%;

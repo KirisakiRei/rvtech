@@ -98,7 +98,7 @@ export function formatHumanDate(date: string): string {
 
 export function resolveThemeGroup(theme: SapatamuThemeCatalogItem) {
   const tierCategory = typeof theme.metadata?.tierCategory === 'string' ? theme.metadata.tierCategory : ''
-  if (tierCategory === 'premium') return 'Premium'
+  if (tierCategory === 'premium') return 'Signature'
   if (tierCategory === 'vintage') return 'Vintage'
   return 'Basic'
 }

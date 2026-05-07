@@ -12,7 +12,7 @@ import { BRAND, PRODUCTS, WEDDING_THEMES, formatRupiah } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
 const features = [
-  { icon: Palette, title: 'Katalog Premium', description: 'Dari minimalis statis hingga full motion, dipilih khusus oleh desainer.', image: '/images/sapa_feat_1.png' },
+  { icon: Palette, title: 'Katalog Signature', description: 'Dari minimalis statis hingga full motion, dipilih khusus oleh desainer.', image: '/images/sapa_feat_1.png' },
   { icon: Heart, title: 'Split View Editor', description: 'Isi form di kiri, lihat hasilnya langsung di preview mockup mobile sebelah kanan.', image: '/images/sapa_feat_2.png' },
   { icon: Users, title: 'RSVP & Buku Tamu', description: 'Tamu bisa konfirmasi kehadiran dan kirim ucapan langsung dari undangan.', image: '/images/sapa_feat_3.png' },
   { icon: Send, title: 'Broadcast WhatsApp', description: 'Generate link personal untuk setiap tamu dan kirim langsung via WhatsApp. Satu klik.', image: '/images/sapa_feat_4.png' },
@@ -66,13 +66,13 @@ const PRICING_TIERS = [
     id: 'royal',
     name: 'Royal Tier',
     price: 259000,
-    badge: 'Premium Experience',
+    badge: 'Signature Experience',
     description: 'Sebuah mahakarya. Interaktivitas penuh yang membuat tamu terpukau.',
     features: [
       { text: 'Akses eksklusif Template Royal', included: true },
       { text: 'Formulir RSVP & Buku Tamu VIP', included: true },
       { text: 'Galeri Foto Unlimited', included: true },
-      { text: 'Premium Background Music', included: true },
+      { text: 'Signature Background Music', included: true },
       { text: 'Full-Motion Scrolling Engine', included: true },
     ]
   }
@@ -180,7 +180,7 @@ export function ProductSapaTamu() {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-foreground leading-tight">Desain Elegan</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Tersedia Beragam Tema Premium</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Tersedia Beragam Tema Signature</p>
                   </div>
                 </motion.div>
 

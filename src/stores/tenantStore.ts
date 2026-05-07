@@ -139,7 +139,7 @@ export const useTenantStore = create<TenantState>((set) => ({
           invitation_id: createdInvitation.data.id,
           version: 1,
           content_json: {
-            selectedTheme: 'premium1',
+            selectedTheme: 'malay-ethnic-red-ruby',
             weddingData: {
               brideName: '',
               groomName: '',
@@ -189,7 +189,7 @@ export const useTenantStore = create<TenantState>((set) => ({
           secondaryColor: '#F5E6D8',
           fontFamily: 'Playfair Display',
           heroStyle: 'fullscreen',
-          templateId: template?.code ?? 'premium1',
+          templateId: template?.code ?? 'malay-ethnic-red-ruby',
         },
         status: invitation.status === 'archived' ? 'expired' : 'active',
         createdAt: invitation.created_at,

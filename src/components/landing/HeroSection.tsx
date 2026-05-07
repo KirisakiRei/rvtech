@@ -118,7 +118,7 @@ export function HeroSection() {
             >
               {[
                 { value: 150, suffix: '+', label: 'Klien Aktif' },
-                { value: 10, suffix: '', label: 'Tema Premium' },
+                { value: 10, suffix: '', label: 'Tema Signature' },
                 { value: 99, suffix: '%', label: 'Kepuasan' },
               ].map((stat) => (
                 <div key={stat.label}>

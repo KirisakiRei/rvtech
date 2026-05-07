@@ -42,16 +42,16 @@ export interface WeddingRsvp {
 }
 
 export type WeddingThemeId =
-  | 'premium1'
-  | 'sarune-batak-sangria'
-  | 'amaryllis-tapestry-red-garnet'
-  | 'asih-prana-pixie'
-  | 'chamomile-mica-beige'
-  | 'gorga-nauli-tano'
-  | 'mezalla-travertine-chalk'
-  | 'panggih-prunella-midnight'
-  | 'sindur-pinayung-imperial'
-  | 'tresna-palakrama-tea-green'
+  | 'malay-ethnic-red-ruby'
+  | 'batak-ethnic-maroon-mistyrose'
+  | 'calla-lily-plum-red-lead'
+  | 'kabagyan-linnea-swan-white'
+  | 'honeysuckle-seashell'
+  | 'hollyhock-nauli-sienna-ivory'
+  | 'cheerfulness-floralwhite'
+  | 'javanese-magnolia-tan-mahogany'
+  | 'polyanthus-linnea-light-coral'
+  | 'javanese-linnea-greenish-white'
 
 export interface WeddingThemePreset {
   id: WeddingThemeId

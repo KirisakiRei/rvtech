@@ -12,15 +12,15 @@ export const PRODUCTS = [
   {
     id: 'sapatamu',
     name: 'SapaTamu',
-    tagline: 'Undangan Digital Premium',
+    tagline: 'Undangan Digital Signature',
     headline: 'Undangan pernikahan digital yang menyentuh hati',
-    description: 'Buat undangan pernikahan digital yang elegan dengan berbagai tema premium, fitur RSVP, dan broadcast otomatis.',
+    description: 'Buat undangan pernikahan digital yang elegan dengan berbagai tema signature, fitur RSVP, dan broadcast otomatis.',
     longDescription: 'Setiap kisah cinta layak diceritakan dengan indah. SapaTamu menghadirkan undangan digital yang bukan sekadar informasi — tapi pengalaman. Dari cover yang personal hingga RSVP otomatis, semua dirancang untuk momen terpenting dalam hidupmu.',
     icon: 'Heart',
     color: '#C45D3E',
     image: '/images/hero-sapatamu.png',
     href: '/produk/sapatamu',
-    highlights: ['10 Tema Premium', 'Live Preview Editor', 'RSVP & Buku Tamu', 'Broadcast WhatsApp', 'Digital Angpao', 'Background Music'],
+    highlights: ['10 Tema Signature', 'Live Preview Editor', 'RSVP & Buku Tamu', 'Broadcast WhatsApp', 'Digital Angpao', 'Background Music'],
   },
   {
     id: 'etalasepro',
@@ -73,7 +73,7 @@ export const PRODUCT_PRICING: Record<string, {
       price: 150000,
       period: '/tahun',
       features: [
-        { text: 'Pilihan 10 tema premium', included: true },
+        { text: 'Pilihan 10 tema signature', included: true },
         { text: 'Formulir RSVP terintegrasi', included: true },
         { text: 'Galeri foto (maks. 10)', included: true },
         { text: 'Countdown timer acara', included: true },
@@ -91,7 +91,7 @@ export const PRODUCT_PRICING: Record<string, {
       period: '/tahun',
       badge: 'Populer',
       features: [
-        { text: 'Pilihan 10 tema premium', included: true },
+        { text: 'Pilihan 10 tema signature', included: true },
         { text: 'Formulir RSVP terintegrasi', included: true },
         { text: 'Galeri foto unlimited', included: true },
         { text: 'Countdown timer acara', included: true },
@@ -221,11 +221,11 @@ export const PRICING = PRODUCT_PRICING.sapatamu
 
 export const WEDDING_THEMES: WeddingThemePreset[] = [
   {
-    id: 'premium1',
-    name: 'Munggah Sriwijaya - Auburn Red',
+    id: 'malay-ethnic-red-ruby',
+    name: 'Malay ethnic - Red ruby',
     group: 'Budaya',
-    description: 'Tema adat Palembang bernuansa auburn red dengan ornamen Sriwijaya',
-    previewImage: '/sapatamu-themes/premium1/original/pictures/picture_17393765661722ej1do.jpeg',
+    description: 'Tema signature Malay ethnic bernuansa red ruby.',
+    previewImage: '/sapatamu-themes/malay-ethnic-red-ruby/original/pictures/picture_17393765661722ej1do.jpeg',
     primaryColor: '#4a1a1f',
     secondaryColor: '#341215',
     accentColor: '#a97f71',
@@ -233,12 +233,13 @@ export const WEDDING_THEMES: WeddingThemePreset[] = [
     fontBody: 'Fahkwang',
     bgPattern: 'batik',
   },
+  ...PUBLIC_SOURCE_THEME_PRESETS.slice(0, 1),
   {
-    id: 'sarune-batak-sangria',
-    name: 'Sarune Batak - Sangria',
+    id: 'batak-ethnic-maroon-mistyrose',
+    name: 'Batak ethnic - maroon mistyrose',
     group: 'Budaya',
-    description: 'Tema adat Batak bernuansa sangria dengan ornamen Sarune',
-    previewImage: '/sapatamu-themes/sarune-batak-sangria/original/pictures/picture_1739377539664wswbzef.jpeg',
+    description: 'Tema signature Batak ethnic bernuansa maroon mistyrose.',
+    previewImage: '/sapatamu-themes/batak-ethnic-maroon-mistyrose/original/pictures/picture_1739377539664wswbzef.jpeg',
     primaryColor: '#7b0f24',
     secondaryColor: '#230c10',
     accentColor: '#b55963',
@@ -246,7 +247,7 @@ export const WEDDING_THEMES: WeddingThemePreset[] = [
     fontBody: 'Fahkwang',
     bgPattern: 'batik',
   },
-  ...PUBLIC_SOURCE_THEME_PRESETS,
+  ...PUBLIC_SOURCE_THEME_PRESETS.slice(1),
 ]
 
 export const NAV_LINKS = [

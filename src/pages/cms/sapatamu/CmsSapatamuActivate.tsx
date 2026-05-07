@@ -61,7 +61,7 @@ export function CmsSapatamuActivate() {
                   {data?.requiredTierCategory === 'basic'
                     ? 'Basic'
                     : data?.requiredTierCategory === 'premium'
-                      ? 'Premium'
+                      ? 'Signature'
                       : 'Vintage'}
                 </h2>
                 <Badge className="border-0 bg-warning/10 text-warning">
